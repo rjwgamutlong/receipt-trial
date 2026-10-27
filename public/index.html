@@ -99,6 +99,13 @@
   #gate h2,#locked h2{font-size:17px;margin:0 0 6px}#gate p,#locked p{margin:0 0 12px;color:var(--muted)}
   #gate .row2{display:flex;gap:8px}#gate .row2 input{flex:1}
   #gateErr{margin-top:8px;color:var(--bad);min-height:18px;font-size:13px}#locked a{color:var(--accent);font-weight:600}
+  #guide{margin-top:16px;max-width:640px}
+  .gcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .gtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.gstep{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .gdots{display:flex;gap:5px}.gdots i{width:8px;height:8px;border-radius:50%;background:var(--line)}.gdots i.on{background:var(--accent)}
+  .gcard h2{font-size:19px;margin:4px 0 10px}.gbody{font-size:15px;line-height:1.55;margin-bottom:14px}.gbody p{margin:0 0 10px}.gbody ul,.gbody ol{margin:0 0 10px;padding-left:20px}.gbody li{margin-bottom:6px}
+  .gbody .tip{background:var(--accent-soft);border-radius:8px;padding:9px 12px;font-size:14px}.gbody .stop{background:var(--flag);color:var(--flag-ink);border-radius:8px;padding:9px 12px;font-size:14px}
+  .manual .card{margin-bottom:12px}.manual h2{font-size:16px;margin-bottom:6px}
   .tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
   .tgrid .cell{padding:8px 10px;border:1px solid var(--line);border-radius:6px}.tgrid .cell span{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
   .tgrid .cell strong{font-family:var(--mono);font-size:18px;font-weight:500}.tgrid input{margin-top:3px;width:100%}
@@ -151,6 +158,16 @@
     <p>The trial code was sent to you by Blyss Digital. To read a receipt, its photo is sent to an outside reading service. Nothing is saved on our server: your clients, records and scans are kept only in this browser, on this computer.</p>
     <div class="row2"><input type="text" id="codeIn" placeholder="Trial code" autocomplete="off" aria-label="Trial code"><button class="btn" id="codeBtn">Start</button></div>
     <div id="gateErr" role="alert"></div>
+  </section>
+
+  <section id="guide" hidden aria-labelledby="gTitle">
+    <div class="gcard">
+      <div class="gtop"><span class="gstep" id="gStep"></span><span class="gdots" id="gDots" aria-hidden="true"></span></div>
+      <h2 id="gTitle"></h2>
+      <div id="gBody" class="gbody"></div>
+      <label class="ack" id="gAckRow" hidden><input type="checkbox" id="gAck"> I have read this manual and I understand that I must check every record before using it.</label>
+      <div class="bar" style="margin-bottom:0"><button class="btn ghost" id="gBack">Back</button><span style="flex:1"></span><button class="btn" id="gNext">Next</button></div>
+    </div>
   </section>
 
   <section id="locked" hidden>
@@ -258,7 +275,7 @@ const ERR = {
   server_setup: 'The trial is not set up yet. Please contact Blyss Digital.'
 };
 function showLocked(kind){
-  $('#gate').hidden = true; $('#app').hidden = true; $('#topctl').hidden = true; $('#navWrap').hidden = true; $('#locked').hidden = false;
+  $('#gate').hidden = true; $('#guide').hidden = true; $('#app').hidden = true; $('#topctl').hidden = true; $('#navWrap').hidden = true; $('#locked').hidden = false;
   $('#lockTitle').textContent = kind === 'limit' ? 'Trial receipts used up' : 'Your trial has ended';
   $('#lockText').textContent = kind === 'limit' ? 'You have used all the receipts included in this trial.' : 'The trial period is over.';
   $('#lockMail').href = 'mailto:' + CONTACT.email; $('#lockMail').textContent = CONTACT.email;
@@ -299,12 +316,54 @@ async function startApp(){
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     }
   }
-  $('#gate').hidden = true; $('#locked').hidden = true; $('#app').hidden = false; $('#topctl').hidden = false; $('#navWrap').hidden = false;
+  if (!guideDone()) { showGuide(); return; }
+  enterApp();
+}
+function enterApp(){
+  $('#gate').hidden = true; $('#locked').hidden = true; $('#guide').hidden = true; $('#app').hidden = false; $('#topctl').hidden = false; $('#navWrap').hidden = false;
   if (!persistOn) warn('This browser window cannot save records (private window?). Everything will be lost when you close it. Open the page in a normal window to keep your work.');
   paintTrial(); draw();
   if (REC.some(r => r.state === 'queued')) { toast('Some files were still waiting to be read. Press Retry on them.'); REC.filter(r => r.state === 'queued').forEach(r => { r.state = 'error'; r.error = 'Not read yet. Press Retry.'; }); draw(); }
 }
 (function boot(){ let saved = ''; try { saved = localStorage.getItem('trialCode') || ''; } catch (e) {} if (saved) tryCode(saved); })();
+
+/* ---------- manual (must be read once before using the app) ---------- */
+const GUIDE_KEY = 'guideOk1';
+const GUIDE = [
+  { t: 'What this tool does', b: `<p>It reads photos of receipts and Z-Reading tapes and puts the details into Excel, in your office's own layout, filed under the right client.</p><ul><li>Purchase receipts go to the monthly VAT and NON-VAT sheets.</li><li>Z-Reading tapes go to the sales sheet.</li><li>Every record keeps its scan, so you can always look back at the original.</li></ul><p class="tip">To read a receipt, its photo is sent to an outside reading service. Nothing is saved on our server.</p>` },
+  { t: '1. Add your clients', b: `<p>On the <b>Dashboard</b>, press <b>Add client</b>.</p><ul><li>Enter the business name and the TIN (9 or 12 digits).</li><li>Choose VAT or NON-VAT.</li><li>Choose whether the client has a cash register. Only clients with a register get Z-Readings.</li></ul><p>The TIN is used to check that a receipt really belongs to this client, so enter it carefully.</p>` },
+  { t: '2. Add receipts', b: `<ol><li>Open <b>Add receipts</b> and choose the client first.</li><li>Choose <b>Purchases</b> or <b>Z-Readings</b>.</li><li>Press <b>Add photos or PDF</b> (or <b>Take a photo</b> on a phone).</li></ol><p>One receipt per photo, or per PDF page. For a good result, lay the receipt flat, use good light, and keep the whole receipt in the picture.</p><p class="tip">Everything you add is filed under the client you chose, so pick the client before you add.</p>` },
+  { t: '3. Check every record', b: `<p>Open <b>Review</b>. For each receipt, compare the fields with the photo next to them.</p><ul><li><b>Yellow fields</b> are the ones the reader was unsure about. Check those first.</li><li>The system warns you if the buyer on the receipt is not the client, or if the same OR number and seller TIN were already saved.</li><li>Fix anything wrong, then press <b>Approve and save</b>.</li></ul><p class="stop">The reader can make mistakes, especially with faded or handwritten receipts. Nothing should go into Excel until a person has checked it.</p>` },
+  { t: '4. Sign off the month and export', b: `<ul><li>On the client's Dashboard, press <b>Mark as reviewed</b>, then <b>Lock month</b>. A locked month cannot be changed by accident.</li><li>Open <b>Export</b> and press <b>Download Excel file</b>. You get one workbook per client.</li><li>Only approved records are included. Records still waiting for a check are left out.</li></ul><p>The <b>Activity</b> tab shows who added, approved and signed off each record.</p>` },
+  { t: '5. Keep your records safe', b: `<ul><li>Your clients, records and scans are stored <b>only in this browser, on this computer</b>. They are not on a server and do not show on other computers.</li><li>Clearing the browser's site data deletes everything.</li><li>Open <b>Backup</b> and press <b>Download backup</b> often, and before the trial ends. <b>Restore</b> puts a backup back.</li></ul><p class="stop">This is a trial. It has a limit on how many receipts it can read and an end date, shown at the top of the screen. When either is reached, the app locks, so download a backup first.</p>` }
+];
+const guideDone = () => { try { return localStorage.getItem(GUIDE_KEY) === '1'; } catch (e) { return false; } };
+let gI = 0;
+function showGuide(){
+  $('#gate').hidden = true; $('#locked').hidden = true; $('#app').hidden = true; $('#topctl').hidden = true; $('#navWrap').hidden = true; $('#guide').hidden = false;
+  gI = 0; drawGuide();
+}
+function drawGuide(){
+  const g = GUIDE[gI], last = gI === GUIDE.length - 1;
+  $('#gStep').textContent = 'Manual · ' + (gI + 1) + ' of ' + GUIDE.length;
+  $('#gDots').innerHTML = GUIDE.map((_, i) => `<i class="${i <= gI ? 'on' : ''}"></i>`).join('');
+  $('#gTitle').textContent = g.t; $('#gBody').innerHTML = g.b;
+  $('#gBack').style.visibility = gI ? 'visible' : 'hidden';
+  $('#gAckRow').hidden = !last; $('#gNext').textContent = last ? 'Start using the app' : 'Next';
+  $('#gNext').disabled = last && !$('#gAck').checked;
+  window.scrollTo(0, 0);
+}
+$('#gBack').onclick = () => { if (gI > 0) { gI--; drawGuide(); } };
+$('#gAck').onchange = () => { $('#gNext').disabled = !$('#gAck').checked; };
+$('#gNext').onclick = () => {
+  if (gI < GUIDE.length - 1) { gI++; drawGuide(); return; }
+  if (!$('#gAck').checked) return;
+  try { localStorage.setItem(GUIDE_KEY, '1'); } catch (e) {}
+  $('#guide').hidden = true; enterApp();
+};
+function vHelp(){
+  return `<div class="manual">${GUIDE.map(g => `<div class="card"><h2>${esc(g.t)}</h2><div class="gbody" style="margin:0">${g.b}</div></div>`).join('')}</div>`;
+}
 
 /* ---------- image preparation ---------- */
 function loadImg(file){
@@ -489,7 +548,7 @@ const needsAck = r => checks(r).some(x => x[0] === 'bad' || /^No buyer|^The TIN 
 const attention = r => r.state === 'pending' && checks(r).some(x => x[0] !== 'ok');
 
 /* ---------- navigation ---------- */
-const TABS = [['dashboard','Dashboard'],['upload','Add receipts'],['review','Review'],['purchases','Purchases'],['sales','Sales (Z-Readings)'],['export','Export'],['activity','Activity'],['backup','Backup']];
+const TABS = [['dashboard','Dashboard'],['upload','Add receipts'],['review','Review'],['purchases','Purchases'],['sales','Sales (Z-Readings)'],['export','Export'],['activity','Activity'],['backup','Backup'],['help','How to use']];
 function drawNav(){
   const pend = REC.filter(r => r.state === 'pending' && (!st.client || r.client === st.client)).length;
   const cur = TABS.find(t => t[0] === st.tab) || TABS[0], nb = $('#navBtn');
@@ -942,7 +1001,7 @@ function draw(){
   if ($('#app').hidden) return;
   drawNav(); drawTop();
   const keep = document.activeElement && document.activeElement.id === 'nm';
-  $('#view').innerHTML = st.tab === 'dashboard' ? vDash() : st.tab === 'upload' ? vUpload() : st.tab === 'review' ? vReview() : st.tab === 'purchases' ? vRecords('purchase') : st.tab === 'sales' ? vRecords('sale') : st.tab === 'export' ? vExport() : st.tab === 'activity' ? vActivity() : vBackup();
+  $('#view').innerHTML = st.tab === 'dashboard' ? vDash() : st.tab === 'upload' ? vUpload() : st.tab === 'review' ? vReview() : st.tab === 'purchases' ? vRecords('purchase') : st.tab === 'sales' ? vRecords('sale') : st.tab === 'export' ? vExport() : st.tab === 'activity' ? vActivity() : st.tab === 'help' ? vHelp() : vBackup();
   hydrate();
   if (st.tab === 'backup' && navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { const el = $('#stor'); if (el && e.usage != null) el.textContent = `Using about ${(e.usage / 1048576).toFixed(1)} MB of the space this browser allows (${((e.quota || 0) / 1073741824).toFixed(1)} GB).`; }).catch(() => {});
 }

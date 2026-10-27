@@ -365,6 +365,86 @@ function vHelp(){
   return `<div class="manual">${GUIDE.map(g => `<div class="card"><h2>${esc(g.t)}</h2><div class="gbody" style="margin:0">${g.b}</div></div>`).join('')}</div>`;
 }
 
+/* ---------- sample data (so the tool can be explored without using up trial receipts) ---------- */
+function drawSampleScan(r, c){
+  return new Promise(res => {
+    const W = 520, lines = [], sale = r.kind === 'sale';
+    const L = (t, o) => lines.push(Object.assign({ t: String(t) }, o || {}));
+    const m = v => Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (sale) {
+      L(r.name, { b: 1, c: 1 }); L('Z-READING', { b: 1, c: 1, big: 1 }); L('TIN: ' + r.tin + '-' + r.branch, { c: 1 }); L('MIN: ' + r.min, { c: 1 }); L('');
+      L('Report date: ' + r.date); L('Last OR no.: ' + r.last_or); L('');
+      L('VATABLE SALES   ' + m(r.vatable_sales), { r: 1 }); L('VAT AMOUNT      ' + m(r.vat_amount), { r: 1 }); L('ZERO RATED      ' + m(r.zero_rated), { r: 1 }); L('VAT EXEMPT      ' + m(r.vat_exempt), { r: 1 });
+      L('NET SALES       ' + m(r.net_sales), { r: 1, b: 1 });
+    } else {
+      L(r.seller, { b: 1, c: 1, big: 1 }); L(r.address, { c: 1 }); L((r.vat_type === 'VAT' ? 'VAT Reg TIN: ' : 'NON-VAT Reg TIN: ') + r.tin, { c: 1 }); L('');
+      L((r.doc_type || 'Sales Invoice').toUpperCase(), { b: 1, c: 1 }); L('No. ' + r.doc_no + '     Date: ' + r.date); L('');
+      L('Sold to: ' + (r.buyer_name || '')); L('TIN: ' + (r.buyer_tin || '')); L('');
+      L('Assorted goods              ' + m(r.gross), { r: 1 }); L('');
+      if (r.vat_type === 'VAT') { const v = r.gross * 100 / 112; L('VATable sales   ' + m(v), { r: 1 }); L('VAT 12%         ' + m(r.gross - v), { r: 1 }); }
+      L('TOTAL AMOUNT DUE  ' + m(r.gross), { r: 1, b: 1 });
+    }
+    L(''); L('SAMPLE ONLY, NOT A REAL RECEIPT', { b: 1, c: 1 });
+    const H = 60 + lines.length * 30 + 40, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const x = cv.getContext('2d'); x.fillStyle = '#fbfaf5'; x.fillRect(0, 0, W, H); x.fillStyle = '#222'; x.textBaseline = 'top';
+    lines.forEach((l, i) => { x.font = (l.b ? 'bold ' : '') + (l.big ? 22 : 17) + 'px "Courier New",monospace'; x.textAlign = l.c ? 'center' : l.r ? 'right' : 'left'; x.fillText(l.t, l.c ? W / 2 : l.r ? W - 30 : 30, 30 + i * 30); });
+    x.save(); x.translate(W / 2, H / 2); x.rotate(-0.5); x.font = 'bold 54px sans-serif'; x.textAlign = 'center'; x.fillStyle = 'rgba(180,0,0,.12)'; x.fillText('SAMPLE', 0, -27); x.restore();
+    cv.toBlob(b => res(b), 'image/jpeg', 0.8);
+  });
+}
+function sampleData(){
+  const ts = Date.now(), A = 'sample-a', B = 'sample-b';
+  const clients = [
+    { id: A, name: 'Sample Sari-Sari Mart (SAMPLE)', tin: '123-456-789-000', vat: 'VAT', who: 'Mara', sales: true, due: '5', sample: true },
+    { id: B, name: 'Sample Bakery (SAMPLE)', tin: '987-654-321-000', vat: 'NON-VAT', who: 'John', sales: false, due: '10', sample: true }
+  ];
+  const recs = []; let n = 0;
+  const P = (cl, date, seller, tin, doc_no, gross, vat, dt, extra) => {
+    const c = clients.find(x => x.id === cl);
+    recs.push(Object.assign({ id: 'sr' + (++n) + '-' + ts, kind: 'purchase', client: cl, name: 'sample-receipt-' + n + '.jpg', state: 'approved', error: '', created: ts + n, by: 'Sample', approvedBy: 'Sample', approvedAt: ts, flags: [], ack: false, sample: true,
+      date, doc_no, tin, seller, address: 'Sample Street, La Trinidad, Benguet', buyer_name: c.name.replace(' (SAMPLE)', ''), buyer_tin: c.tin, gross, vat_type: vat, doc_type: dt || 'Sales Invoice', notValid: false }, extra || {}));
+  };
+  const W = ['Sample Wholesale Grocers', '000-100-200-000'], D = ['Sample Beverage Distributor', '000-100-300-000'], H = ['Sample Hardware Supply', '000-100-400-000'], K = ['Sample Packaging Trading', '000-100-500-000'], S = ['Sample Market Stall', '000-100-600-000'];
+  P(A, '2026-09-02', W[0], W[1], '10231', 18450.5, 'VAT'); P(A, '2026-09-05', D[0], D[1], '4410', 9320, 'VAT'); P(A, '2026-09-09', H[0], H[1], '88120', 2150, 'VAT');
+  P(A, '2026-09-12', W[0], W[1], '10288', 21780.25, 'VAT'); P(A, '2026-09-16', K[0], K[1], '3302', 1560, 'VAT'); P(A, '2026-09-19', S[0], S[1], '0071', 840, 'NON-VAT', 'Official Receipt');
+  P(A, '2026-09-23', D[0], D[1], '4477', 11200, 'VAT'); P(A, '2026-09-27', W[0], W[1], '10340', 16990, 'VAT');
+  P(A, '2026-10-01', W[0], W[1], '10402', 19875.75, 'VAT'); P(A, '2026-10-03', D[0], D[1], '4520', 8750, 'VAT'); P(A, '2026-10-06', K[0], K[1], '3391', 2240, 'VAT');
+  const BB = [['Sample Flour Mill', '000-200-100-000'], ['Sample Egg Supplier', '000-200-200-000'], ['Sample Sugar Trading', '000-200-300-000']];
+  [['2026-09-03', 0, '5501', 6400], ['2026-09-10', 1, '1204', 2850], ['2026-09-17', 2, '7710', 3900], ['2026-09-24', 0, '5538', 6400], ['2026-10-02', 1, '1251', 3100], ['2026-10-05', 2, '7766', 4200]].forEach(x => P(B, x[0], BB[x[1]][0], BB[x[1]][1], x[2], x[3], 'NON-VAT', 'Official Receipt'));
+  const Z = (date, last, v) => {
+    const vat = Math.round(v * 12) / 100;
+    recs.push({ id: 'sr' + (++n) + '-' + ts, kind: 'sale', client: A, name: 'Sample Sari-Sari Mart', state: 'approved', error: '', created: ts + n, by: 'Sample', approvedBy: 'Sample', approvedAt: ts, flags: [], ack: false, sample: true,
+      date, tin: '123-456-789', branch: '000', min: '21090112345', last_or: last, vatable_sales: v, vat_amount: vat, zero_rated: 0, vat_exempt: 0, net_sales: Math.round((v + vat) * 100) / 100, report_type: 'Z-Reading', remarks: '' });
+  };
+  Z('2026-09-28', '000611', 12480.5); Z('2026-09-29', '000648', 15320); Z('2026-09-30', '000690', 14110.75); Z('2026-10-01', '000731', 13950); Z('2026-10-02', '000772', 16240.25); Z('2026-10-03', '000815', 17005);
+  P(A, '2026-10-07', 'Sample Cold Chain Foods', '000-100-700-000', '9120', 7400, 'VAT', 'Sales Invoice', { state: 'pending', approvedBy: undefined, approvedAt: undefined, buyer_name: 'Another Business Corp', buyer_tin: '555-444-333-000' });
+  P(A, '2026-10-08', 'Sample Snack Wholesaler', '000-100-800-000', '2290', 5320, 'VAT', 'Sales Invoice', { state: 'pending', approvedBy: undefined, approvedAt: undefined, buyer_name: '', buyer_tin: '', flags: ['date'] });
+  return { clients, recs };
+}
+async function loadSamples(){
+  if (CL.some(c => c.sample)) { toast('Sample data is already loaded.'); return; }
+  toast('Loading sample data...');
+  const { clients, recs } = sampleData();
+  for (const c of clients) { CL.push(c); await dbPut('clients', c); }
+  for (const r of recs) {
+    const blob = await drawSampleScan(r, clientOf(r.client));
+    await putScan(r.id, blob); REC.push(r); await saveRec(r);
+  }
+  await log('Loaded sample data', clients[0].id);
+  st.client = ''; st.tab = 'dashboard'; toast('Sample data loaded. Clients named (SAMPLE) can be removed from the Backup tab.'); draw();
+}
+async function removeSamples(){
+  const ids = new Set(CL.filter(c => c.sample).map(c => c.id));
+  if (!ids.size) { toast('There is no sample data to remove.'); return; }
+  for (const r of REC.filter(r => ids.has(r.client))) { await dbDel('records', r.id); await dbDel('scans', r.id); URLS.delete(r.id); MEMSCANS.delete(r.id); PARTS.delete(r.id); }
+  REC = REC.filter(r => !ids.has(r.client));
+  for (const id of ids) { await dbDel('clients', id); Object.keys(SIGN).filter(k => k.startsWith(id + '|')).forEach(k => delete SIGN[k]); }
+  CL = CL.filter(c => !ids.has(c.id)); LOG = LOG.filter(l => !ids.has(l.client));
+  await dbClear('log'); for (const l of [...LOG].reverse()) await dbAdd('log', l);
+  await saveSign(); if (ids.has(st.client)) st.client = ''; st.confirm = ''; st.sel = null; st.review = null;
+  toast('Sample data removed.'); draw();
+}
+
 /* ---------- image preparation ---------- */
 function loadImg(file){
   return new Promise((res, rej) => {
@@ -613,7 +693,7 @@ function clientForm(c){
   <div class="bar"><button class="btn" id="saveClient">Save client</button><button class="btn ghost" id="cancelClient">Cancel</button></div></div>`;
 }
 function vFirm(){
-  if (!CL.length) return `<div class="card empty"><h2>Add your first client</h2><p class="note" style="max-width:36rem;margin:6px auto 12px">Each client gets its own space. Receipts and Z-Readings are filed under the client you pick, so records never get mixed.</p><button class="btn" data-add>Add client</button></div>${st.editing === 'new' ? clientForm() : ''}`;
+  if (!CL.length) return `<div class="card empty"><h2>Add your first client</h2><p class="note" style="max-width:36rem;margin:6px auto 12px">Each client gets its own space. Receipts and Z-Readings are filed under the client you pick, so records never get mixed.</p><button class="btn" data-add>Add client</button> <button class="btn ghost" data-sample>Try with sample data</button></div>${st.editing === 'new' ? clientForm() : ''}`;
   const rows = CL.map(c => ({ c, s: status(c) }));
   const behind = rows.filter(x => x.s.label === 'Nothing received').length, rev = REC.filter(r => r.state === 'pending').length, ready = rows.filter(x => x.s.label === 'Ready for review').length, done = rows.filter(x => x.s.cls === 'lock' || x.s.label === 'Reviewed').length;
   const approvedNow = REC.filter(r => approved(r) && monthOf(r) === curMonth()).length;
@@ -993,6 +1073,8 @@ function vBackup(){
   <div class="bar"><button class="btn" id="bkDl">Download backup</button><span class="count">${CL.length} client${CL.length === 1 ? '' : 's'}, ${n} approved record${n === 1 ? '' : 's'}, ${REC.length - n} waiting</span></div>
   <div class="bar" style="margin-top:18px"><button class="btn ghost" id="bkRestore">${st.confirm === 'restore' ? 'Press again to choose the file' : 'Restore from a backup file'}</button><span class="count">Restoring replaces everything now in this browser.</span></div>
   <p class="note" id="stor"></p></div>
+  <div class="card" style="margin-top:12px"><h2>Sample data</h2><p class="note">Fake clients, receipts and Z-Readings so you can try every screen without using up trial receipts. They are clearly named (SAMPLE) and never mix with your real clients.</p>
+  <div class="bar"><button class="btn ghost" data-sample>Load sample data</button><button class="btn danger" data-nosample>Remove sample data</button></div></div>
   <div class="card" style="margin-top:12px"><h2>What the paid version adds</h2><p class="note">Records and scans kept online so any computer in the office can open them, staff logins with separate preparer and reviewer roles, a full audit trail, and automatic backups.</p></div>`;
 }
 
@@ -1008,6 +1090,8 @@ function draw(){
 $('#view').addEventListener('click', async e => {
   const t = e.target; let b;
   if (t.closest('[data-add]')) { st.tab = st.tab === 'upload' ? 'dashboard' : st.tab; if (st.tab !== 'dashboard') st.tab = 'dashboard'; st.client = ''; st.editing = 'new'; draw(); const n = $('#nc-name'); if (n) n.focus(); return; }
+  if (t.closest('[data-sample]')) { loadSamples(); return; }
+  if (t.closest('[data-nosample]')) { removeSamples(); return; }
   if (b = t.closest('[data-edit]')) { st.editing = b.dataset.edit; draw(); return; }
   if (t.closest('#cancelClient')) { st.editing = null; draw(); return; }
   if (t.closest('#saveClient')) {

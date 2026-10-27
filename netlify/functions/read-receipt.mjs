@@ -279,7 +279,7 @@ export default async (req) => {
   const total = images.reduce((a, s) => a + String(s).length, 0);
   if (total > 5_000_000) return json({ error: "too_big" }, 413);
 
-  const provider = (env.PROVIDER || "gemini").toLowerCase();
+  const provider = (env.PROVIDER || (env.OCR_SPACE_KEY && !env.GEMINI_API_KEY ? "rules" : "gemini")).toLowerCase();
   let ocrText = "";
   if (env.OCR_SPACE_KEY) {
     try { ocrText = await readWithOcr(images, env.OCR_SPACE_KEY, 7000); }

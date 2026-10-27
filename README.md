@@ -1,5 +1,7 @@
 # No-AI mode (OCR text read by plain code)
 
+No Gemini needed anywhere. If you set OCR_SPACE_KEY and do not set GEMINI_API_KEY, this mode is used automatically.
+
 Set PROVIDER to `rules` and keep OCR_SPACE_KEY set. OCR.space turns the photo into text, then ordinary code (patterns, no AI model) fills the TIN, date, document number, total, VAT or non-VAT, and for Z-Readings the sales lines. No Gemini, Claude or OpenAI key is needed. Only ACCESS_CODE, TRIAL_MAX and TRIAL_EXPIRES are still required.
 - Works well on clean printed POS receipts and Z-Readings.
 - Weak on booklet-style invoices, faded or crumpled paper and handwriting. Expect many yellow fields (the app marks anything the code is unsure of) and manual fixes.

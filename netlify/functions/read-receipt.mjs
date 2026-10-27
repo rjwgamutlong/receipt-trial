@@ -10,7 +10,7 @@
 //   MODEL              optional, Claude model, default claude-sonnet-5-5
 import { getStore } from "@netlify/blobs";
 
-const PROMPT = `The attached image or images show ONE receipt or invoice from the Philippines. It may be a printed POS receipt, a printed or booklet-style sales invoice, cash sales invoice, order slip, delivery receipt or collection receipt, and it may be handwritten. If several images are attached, they are overlapping slices of the same long receipt, in order from top to bottom: read them as one document.
+const PROMPT_PURCHASE = `The attached image or images show ONE receipt or invoice from the Philippines. It may be a printed POS receipt, a printed or booklet-style sales invoice, cash sales invoice, order slip, delivery receipt or collection receipt, and it may be handwritten. If several images are attached, they are overlapping slices of the same long receipt, in order from top to bottom: read them as one document.
 
 An accounting office needs these details about the SELLER (the business that issued the document), taken from the header at the top. Reply with ONLY one JSON object, no other text.
 
@@ -40,6 +40,43 @@ Rules:
 - not_valid_for_input_tax: true only if the document says it is not valid for claiming input tax, otherwise false.
 - Never guess. If something is unreadable, use null and add its name to "uncertain".
 - If an image holds more than one separate receipt, read only the first and add "multiple_receipts" to "uncertain".`;
+
+const PROMPT_SALE = `The attached image or images show ONE end-of-day sales report, called a "Z-Reading" or "Terminal Z-Reading", printed by a cash register or POS machine in the Philippines. The photo may be sideways or upside down: read it as if it were turned upright. If several images are attached, they are overlapping slices of the same long report, in order: read them as one document.
+
+An accounting office needs these figures for its sales records. Reply with ONLY one JSON object, no other text.
+
+Schema:
+{
+  "report_type": "Z" or "X" or other text,
+  "date": "YYYY-MM-DD" or null,
+  "tin": string or null,
+  "name": string or null,
+  "min": string or null,
+  "terminal": string or null,
+  "first_or": string or null,
+  "last_or": string or null,
+  "vatable_sales": number or null,
+  "vat_amount": number or null,
+  "zero_rated": number or null,
+  "vat_exempt": number or null,
+  "net_sales": number or null,
+  "gross_sales": number or null,
+  "uncertain": [ names of fields you are not sure about ]
+}
+
+Rules:
+- date: the report date printed under "Z-READING" (the day the sales belong to), as YYYY-MM-DD. NOT the "Date Printed" line, which can be the next day.
+- tin: the "VAT/TIN" or "TIN" at the top, exactly as printed with all digits, for example "429-501-834-000". The last three digits are the branch code.
+- name: the business name at the top.
+- min: the MIN (Machine Identification Number) printed in the header, digits only. Not the serial number (SN), not the PTU or permit number, not the accreditation number.
+- last_or: the "End Invoice No" (also "End OR No" or "Ending Invoice"), the last invoice number of that day. Keep every leading zero, for example "00097521". first_or: the "Start Invoice No".
+- vatable_sales: the "VAT Sales" amount. vat_amount: the "VAT Amount". zero_rated: the "Zero Rated" amount. vat_exempt: the "VAT Exempt Sales" amount in the same block as VAT Sales (not a "Less VAT Exempt" deduction line above).
+- net_sales: the "Net Sales" amount. gross_sales: the "Gross Sales" amount.
+- All amounts are plain numbers with no currency symbol and no commas. A printed 0.00 is the number 0.
+- Never guess. If something is unreadable, use null and add its name to "uncertain". Do not do any arithmetic: copy the printed figures.
+- If the image is an X-Reading or any report other than a Z-Reading, set report_type to what it says.`;
+
+const PROMPTS = { purchase: PROMPT_PURCHASE, sale: PROMPT_SALE };
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
@@ -82,7 +119,7 @@ export default async (req) => {
         type: "image",
         source: { type: "base64", media_type: "image/jpeg", data: String(b64) }
       }));
-      content.push({ type: "text", text: PROMPT });
+      content.push({ type: "text", text: PROMPTS[body.kind === "sale" ? "sale" : "purchase"] });
       res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -100,7 +137,7 @@ export default async (req) => {
       if (!env.GEMINI_API_KEY) return json({ error: "server_setup" }, 500);
       const model = env.GEMINI_MODEL || "gemini-3.8-flash";
       const parts = images.map((b64) => ({ inline_data: { mime_type: "image/jpeg", data: String(b64) } }));
-      parts.push({ text: PROMPT });
+      parts.push({ text: PROMPTS[body.kind === "sale" ? "sale" : "purchase"] });
       res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },

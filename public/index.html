@@ -55,6 +55,10 @@
   #gateErr{margin-top:8px;color:var(--bad);min-height:18px;font-size:13px}
   #locked a{color:var(--accent);font-weight:600}
 
+  .tabs{display:flex;gap:6px;margin-top:14px}
+  .tab{padding:8px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--muted);font-weight:600}
+  .tab.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .kind{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--flag);color:#3a3000;border:1px solid var(--flag-line)}
   #trialBar{margin-top:14px;padding:8px 12px;border-radius:6px;background:var(--flag);color:#3a3000;border:1px solid var(--flag-line);font-size:13px}
 
   #intake{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:16px;border:1.5px dashed var(--line);border-radius:10px;background:var(--surface)}
@@ -122,7 +126,7 @@
 <div class="wrap">
   <header>
     <h1>Receipt to Excel <span class="badge">TRIAL</span></h1>
-    <p>Add photos or PDF scans of receipts. The system reads each one, you check what is marked in yellow, then export to Excel: your monthly VAT and NON-VAT sheets, plus one ALL RECEIPTS sheet you can filter and search.</p>
+    <p>Add photos or PDF scans of receipts. The system reads each one, you check what is marked in yellow, then export to Excel in your own formats: purchases (VAT and NON-VAT sheets by month) and daily sales from Z-Readings, each with a sheet you can filter and search.</p>
   </header>
 
   <section id="gate">
@@ -145,10 +149,14 @@
 
   <div id="app" hidden>
     <div id="trialBar"></div>
+    <div class="tabs" role="tablist" aria-label="What are you adding?">
+      <button class="tab on" role="tab" aria-selected="true" data-mode="purchase" id="tabP">Purchases (receipts)</button>
+      <button class="tab" role="tab" aria-selected="false" data-mode="sale" id="tabS">Sales (Z-Readings)</button>
+    </div>
     <div id="intake">
       <button class="btn" id="addBtn">Add photos or PDF</button>
       <button class="btn ghost" id="camBtn">Take a photo</button>
-      <span class="hint">Printed and handwritten receipts both work. One receipt per photo or per PDF page, flat and well lit.</span>
+      <span class="hint" id="hint"></span>
       <input type="file" id="file" accept="image/*,application/pdf" multiple hidden>
       <input type="file" id="cam" accept="image/*" capture="environment" hidden>
       <button class="btn ghost" id="stopBtn" hidden>Stop</button>
@@ -209,6 +217,39 @@ const FIELDS = [
 ];
 const NUMERIC = new Set(['total']);
 const KEY = ['date','doc_no','tin','name','address','total','vat_type'];
+
+/* Sales side: one end-of-day Z-Reading per register, exported into the office's ESALES layout. */
+const SFIELDS = [
+  ['date','Report date','',''],
+  ['tin','TIN (9 digits)','',''],
+  ['branch','Branch code','',''],
+  ['min','MIN','',''],
+  ['last_or','Last OR / invoice no.','',''],
+  ['vatable_sales','Vatable sales','num',''],
+  ['vat_amount','VAT amount','num',''],
+  ['zero_rated','Zero rated sales','num',''],
+  ['vat_exempt','VAT exempt sales','num',''],
+  ['net_sales','Net sales (for checking)','num',''],
+  ['name','Business name','span2',''],
+  ['remarks','Remarks','span2','']
+];
+const SKEY = ['date','tin','branch','min','last_or','vatable_sales','vat_amount'];
+const AMT = ['vatable_sales','vat_amount','zero_rated','vat_exempt','net_sales'];
+const fieldsFor = r => r.kind === 'sale' ? SFIELDS : FIELDS;
+const keyFor = r => r.kind === 'sale' ? SKEY : KEY;
+let mode = 'purchase';
+const HINTS = {
+  purchase: 'Printed and handwritten receipts both work. One receipt per photo or per PDF page, flat and well lit.',
+  sale: 'One photo or PDF page per Z-Reading (end-of-day report) from the cash register. Sideways photos are turned upright automatically. Use Rotate if one is still wrong.'
+};
+function setMode(m){
+  mode = m;
+  $('tabP').classList.toggle('on', m === 'purchase'); $('tabS').classList.toggle('on', m === 'sale');
+  $('tabP').setAttribute('aria-selected', m === 'purchase'); $('tabS').setAttribute('aria-selected', m === 'sale');
+  $('hint').textContent = HINTS[m];
+}
+$('tabP').onclick = () => setMode('purchase'); $('tabS').onclick = () => setMode('sale');
+setMode('purchase');
 
 const ERR = {
   bad_code: 'That trial code is not correct.',
@@ -275,13 +316,13 @@ $('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('codeBtn
 /* ---------- photo and PDF intake ---------- */
 $('addBtn').onclick = () => $('file').click();
 $('camBtn').onclick = () => $('cam').click();
-$('file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
-$('cam').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+$('cam').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
 $('stopBtn').onclick = () => { stopped = true; if (ctl) ctl.abort(); };
 const intake = $('intake');
 ['dragenter','dragover'].forEach(ev => intake.addEventListener(ev, e => { e.preventDefault(); intake.classList.add('over'); }));
 ['dragleave','drop'].forEach(ev => intake.addEventListener(ev, e => { e.preventDefault(); intake.classList.remove('over'); }));
-intake.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+intake.addEventListener('drop', e => addFiles([...e.dataTransfer.files]));
 
 function loadImg(file){
   return new Promise((res, rej) => {
@@ -351,7 +392,24 @@ async function pdfPages(file){
 }
 
 function newReceipt(name){
-  return { id: nextId++, name, status: 'queued', data: null, error: '', checked: false, parts: null, url: '' };
+  return { id: nextId++, name, kind: mode, status: 'queued', data: null, error: '', checked: false, parts: null, url: '', src: null };
+}
+/* Turn an image a quarter turn clockwise. */
+function rotateSrc(src){
+  const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+  const c = document.createElement('canvas'); c.width = h; c.height = w;
+  const x = c.getContext('2d'); x.translate(h, 0); x.rotate(Math.PI / 2); x.drawImage(src, 0, 0);
+  return c;
+}
+/* Z-Reading tapes are long and narrow, and are often photographed lying down. */
+function uprightIfSideways(src, kind){
+  const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+  return (kind === 'sale' && w > h * 1.15) ? rotateSrc(src) : src;
+}
+async function setPhoto(r, src, auto = true){
+  r.src = auto ? uprightIfSideways(src, r.kind) : src;
+  const p = await prepare(r.src);
+  r.parts = p.parts; if (r.url) URL.revokeObjectURL(r.url); r.url = URL.createObjectURL(p.thumb);
 }
 
 async function addFiles(files){
@@ -363,7 +421,7 @@ async function addFiles(files){
         const { pages, skipped } = await pdfPages(f);
         for (const pg of pages) {
           const r = newReceipt(pg.label);
-          try { const p = await prepare(pg.canvas); r.parts = p.parts; r.url = URL.createObjectURL(p.thumb); }
+          try { await setPhoto(r, pg.canvas); }
           catch(e){ r.status = 'error'; r.error = e.message; }
           receipts.push(r);
         }
@@ -377,7 +435,7 @@ async function addFiles(files){
     }
     if (!f.type.startsWith('image/')) continue;
     const r = newReceipt(f.name || 'photo');
-    try { const p = await prepare(await loadImg(f)); r.parts = p.parts; r.url = URL.createObjectURL(p.thumb); }
+    try { await setPhoto(r, await loadImg(f)); }
     catch(e){ r.status = 'error'; r.error = e.message; }
     receipts.push(r);
   }
@@ -401,7 +459,25 @@ async function processQueue(){
   }
 }
 
-function normalise(d){
+const fmtTin = dg => `${dg.slice(0,3)}-${dg.slice(3,6)}-${dg.slice(6,9)}`;
+function normaliseSale(d){
+  const out = {};
+  out.date = d.date ?? '';
+  const dg = String(d.tin ?? '').replace(/\D/g, '');
+  if (dg.length >= 12) { out.tin = fmtTin(dg); out.branch = dg.slice(9, 12); }
+  else if (dg.length >= 9) { out.tin = fmtTin(dg); out.branch = dg.slice(9) ; }
+  else { out.tin = d.tin ?? ''; out.branch = ''; }
+  out.min = String(d.min ?? '').replace(/\s/g, '');
+  out.last_or = d.last_or ?? '';
+  AMT.forEach(k => { out[k] = d[k] ?? ''; });
+  out.name = d.name ?? ''; out.remarks = '';
+  out.report_type = String(d.report_type ?? '');
+  out.not_valid_for_input_tax = false;
+  out.uncertain = Array.isArray(d.uncertain) ? d.uncertain.map(String) : [];
+  return out;
+}
+function normalise(d, kind){
+  if (kind === 'sale') return normaliseSale(d);
   const out = {};
   out.date = d.date ?? '';
   out.doc_no = d.doc_no ?? '';
@@ -423,9 +499,9 @@ async function extract(r){
   setMsg(queued ? `Reading ${r.name}. ${queued} more waiting.` : `Reading ${r.name}.`);
   ctl = new AbortController();
   try {
-    const out = await callApi({ code, images: r.parts }, ctl.signal);
+    const out = await callApi({ code, images: r.parts, kind: r.kind }, ctl.signal);
     if (!out.data || typeof out.data !== 'object') throw { code: 'invalid_json' };
-    r.data = normalise(out.data); r.status = 'done';
+    r.data = normalise(out.data, r.kind); r.status = 'done';
     trial.remaining = out.remaining; paintTrial();
   } catch(e) {
     if (e.code === 'expired' || e.code === 'limit') { ctl = null; setMsg(''); showLocked(e.code); stopped = true; return; }
@@ -436,12 +512,26 @@ async function extract(r){
 }
 
 /* ---------- checking and editing ---------- */
-const LABEL = Object.fromEntries(FIELDS.map(f => [f[0], f[1]]));
+const LABEL = Object.fromEntries([...FIELDS, ...SFIELDS].map(f => [f[0], f[1]]));
 const friendly = k => k === 'multiple_receipts' ? 'more than one receipt in the photo' : (LABEL[k] || k.replace('_',' ')).toLowerCase();
 const blank = (r, k) => !String(r.data[k] ?? '').trim();
-const missing = r => KEY.filter(k => blank(r, k));
-const warn = (r, k) => (r.data.uncertain.includes(k) || (KEY.includes(k) && blank(r, k))) ? ' warn' : '';
-const needsAttention = r => r.status === 'done' && !r.checked && (r.data.uncertain.length > 0 || missing(r).length > 0);
+const missing = r => keyFor(r).filter(k => blank(r, k));
+/* Z-Reading arithmetic: the parts must add up to net sales, and VAT must be about 12 percent of vatable sales. */
+function saleIssue(r){
+  if (r.kind !== 'sale') return '';
+  const d = r.data, n = k => num(d[k]);
+  const out = [];
+  if (d.report_type && !/^z/i.test(d.report_type.trim())) out.push('This looks like a ' + d.report_type + ' report, not a Z-Reading.');
+  const vs = n('vatable_sales'), va = n('vat_amount'), net = n('net_sales');
+  if (vs != null && va != null && net != null) {
+    const parts = vs + va + (n('zero_rated') || 0) + (n('vat_exempt') || 0);
+    if (Math.abs(parts - net) > 0.06) out.push('The amounts add up to ' + parts.toFixed(2) + ' but net sales says ' + net.toFixed(2) + '. Check the figures against the photo.');
+  }
+  if (vs != null && va != null && Math.abs(va - vs * 0.12) > 1 + vs * 0.0003) out.push('VAT amount is not about 12 percent of vatable sales.');
+  return out.join(' ');
+}
+const warn = (r, k) => (r.data.uncertain.includes(k) || (keyFor(r).includes(k) && blank(r, k)) || (r.kind === 'sale' && AMT.includes(k) && saleIssue(r))) ? ' warn' : '';
+const needsAttention = r => r.status === 'done' && !r.checked && (r.data.uncertain.length > 0 || missing(r).length > 0 || !!saleIssue(r));
 
 function fieldHtml(r, [k, label, kind]){
   const d = r.data, id = `f${r.id}${k}`, w = warn(r, k);
@@ -457,13 +547,13 @@ function fieldHtml(r, [k, label, kind]){
 
 function card(r){
   let h = `<article class="card" id="c${r.id}"><div class="photo">${r.url ? `<img src="${r.url}" alt="Photo of ${esc(r.name)}">` : ''}</div><div>`;
-  h += `<div class="top"><b>${esc(r.name)}</b><span class="tag ${r.status === 'done' ? 'done' : r.status === 'error' ? 'error' : ''}">${r.status === 'done' ? 'Read' : r.status === 'error' ? 'Problem' : r.status === 'reading' ? 'Reading' : 'Waiting'}</span><span class="spacer"></span><button class="btn danger small" data-act="remove" data-id="${r.id}">Remove</button></div>`;
+  h += `<div class="top"><b>${esc(r.name)}</b>${r.kind === 'sale' ? '<span class="kind">Z-Reading</span>' : ''}<span class="tag ${r.status === 'done' ? 'done' : r.status === 'error' ? 'error' : ''}">${r.status === 'done' ? 'Read' : r.status === 'error' ? 'Problem' : r.status === 'reading' ? 'Reading' : 'Waiting'}</span><span class="spacer"></span>${r.src ? `<button class="btn ghost small" data-act="rotate" data-id="${r.id}">Rotate</button>` : ''}<button class="btn danger small" data-act="remove" data-id="${r.id}">Remove</button></div>`;
   if (r.status === 'error') {
     h += `<p style="color:var(--bad);margin:0 0 10px">${esc(r.error)}</p>` + (r.parts ? `<button class="btn small" data-act="retry" data-id="${r.id}">Retry</button>` : '');
   } else if (r.status !== 'done') {
     h += `<div class="reading"><span class="dots"></span>${r.status === 'reading' ? 'Reading this receipt...' : 'Waiting for its turn...'}</div>`;
   } else {
-    h += `<div class="fields">${FIELDS.map(f => fieldHtml(r, f)).join('')}</div>`;
+    h += `<div class="fields">${fieldsFor(r).map(f => fieldHtml(r, f)).join('')}</div>`;
     h += `<div class="row"><label class="check"><input type="checkbox" id="k${r.id}" data-act="check" data-id="${r.id}" ${r.checked ? 'checked' : ''}> I checked this receipt</label>
           <span style="font-size:12px;color:var(--muted)">${r.parts && r.parts.length > 1 ? 'Read in ' + r.parts.length + ' slices' : ''}</span></div>`;
     h += `<div class="check-badge" id="b${r.id}"></div><div class="unsure" id="u${r.id}"></div>`;
@@ -480,12 +570,14 @@ function refreshCard(id){
     const m = missing(r), un = r.data.uncertain;
     const bits = [];
     if (r.data.not_valid_for_input_tax) bits.push('This document says it is not valid for claiming input tax.');
+    const si = saleIssue(r); if (si) bits.push(si);
     if (un.length) bits.push('Unsure about: ' + un.map(friendly).join(', ') + '.');
     if (m.length) bits.push('Still empty: ' + m.map(friendly).join(', ') + '. Fill them in if they are on the receipt.');
     const bad = bits.length > 0;
     b.className = 'check-badge ' + (bad ? 'bad' : 'ok');
     b.textContent = bad ? bits.join(' ') : 'All details found. Please compare them with the photo.';
   }
+  fieldsFor(r).forEach(f => { const el = $(`f${id}${f[0]}`); if (el) el.classList.toggle('warn', !!warn(r, f[0])); });
   if (u) u.textContent = '';
   if (k) k.checked = r.checked;
 }
@@ -517,6 +609,10 @@ function timeCalc(n){
 }
 $('tManual').oninput = $('tCheck').oninput = () => timeCalc(receipts.filter(r => r.status === 'done').length);
 
+async function rotateAndRetry(r){
+  try { await setPhoto(r, rotateSrc(r.src), false); r.status = 'queued'; r.error = ''; r.checked = false; render(); processQueue(); }
+  catch(e){ r.status = 'error'; r.error = e.message || 'Could not turn this photo.'; render(); }
+}
 const list = $('list');
 function onEdit(e){
   const t = e.target, id = Number(t.dataset.id), k = t.dataset.k;
@@ -524,7 +620,6 @@ function onEdit(e){
   const r = get(id); if (!r || !r.data) return;
   r.data[k] = t.value;
   r.data.uncertain = r.data.uncertain.filter(x => x !== k);
-  t.classList.remove('warn');
   r.checked = false;
   refreshCard(id); stats();
 }
@@ -539,6 +634,7 @@ list.addEventListener('click', e => {
   const id = Number(b.dataset.id), r = get(id), act = b.dataset.act;
   if (act === 'remove') { if (r.url) URL.revokeObjectURL(r.url); receipts = receipts.filter(x => x.id !== id); render(); }
   else if (act === 'retry') { r.status = 'queued'; r.error = ''; render(); processQueue(); }
+  else if (act === 'rotate') { rotateAndRetry(r); }
 });
 
 /* ---------- export in the office's own Excel format ---------- */
@@ -552,8 +648,17 @@ function parseDate(s){
   return { y, mo, d };
 }
 
+function salesFromReceipts(list){
+  return list.filter(r => r.status === 'done' && r.kind === 'sale').map(r => {
+    const d = r.data, t = k => String(d[k] ?? '').trim();
+    return { date: t('date'), tin: t('tin'), branch: t('branch') || '000', name: t('name'), min: t('min'), last_or: t('last_or'),
+      vatable_sales: num(d.vatable_sales), vat_amount: num(d.vat_amount), zero_rated: num(d.zero_rated), vat_exempt: num(d.vat_exempt),
+      net_sales: num(d.net_sales), remarks: t('remarks'), source: r.name, checked: r.checked ? 'Yes' : 'No' };
+  });
+}
+
 function rowsFromReceipts(list){
-  return list.filter(r => r.status === 'done').map(r => ({
+  return list.filter(r => r.status === 'done' && r.kind !== 'sale').map(r => ({
     date: String(r.data.date || '').trim(), doc_no: String(r.data.doc_no || '').trim(), tin: String(r.data.tin || '').trim(),
     name: String(r.data.name || '').trim(), address: String(r.data.address || '').trim(),
     total: num(r.data.total), vat_type: r.data.vat_type === 'NON-VAT' ? 'NON-VAT' : 'VAT',
@@ -562,7 +667,7 @@ function rowsFromReceipts(list){
 }
 
 /* One VAT sheet and one NON-VAT sheet for each month found, laid out like the office's sample file. */
-function buildWorkbook(ExcelJSLib, rows, contact){
+function buildWorkbook(ExcelJSLib, rows, contact, sales = []){
   const wb = new ExcelJSLib.Workbook();
   const groups = new Map();
   for (const row of rows) {
@@ -574,75 +679,146 @@ function buildWorkbook(ExcelJSLib, rows, contact){
   const keys = [...groups.keys()].sort();
   const names = new Set();
 
-  /* One master sheet with every receipt: filter by date, name or TIN, or search with Ctrl+F. */
-  const all = wb.addWorksheet('ALL RECEIPTS');
-  names.add('ALL RECEIPTS');
-  const allHeads = ['DATE','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS AMOUNT','VAT / NON-VAT','DOCUMENT TYPE','SOURCE FILE','CHECKED'];
-  allHeads.forEach((h, i) => {
-    const c = all.getCell(1, i + 1);
-    c.value = h; c.font = { name: 'Calibri', size: 12, bold: true };
-    c.alignment = { horizontal: 'center', vertical: 'middle' };
-    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7EFEA' } };
-  });
-  [12,16,17,41,36,16,14,18,30,10].forEach((w, i) => { all.getColumn(i + 1).width = w; });
-  const sorted = rows.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
-  sorted.forEach((r, i) => {
-    const n = 2 + i, p = parseDate(r.date);
-    const dc = all.getCell(n, 1);
-    if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm/dd/yyyy'; } else dc.value = r.date;
-    all.getCell(n, 2).value = r.doc_no;
-    all.getCell(n, 3).value = r.tin;
-    all.getCell(n, 4).value = r.name;
-    all.getCell(n, 5).value = r.address;
-    const g = all.getCell(n, 6); g.value = r.total; g.numFmt = '#,##0.00';
-    all.getCell(n, 7).value = r.vat_type;
-    all.getCell(n, 8).value = r.doc_type;
-    all.getCell(n, 9).value = r.source;
-    all.getCell(n, 10).value = r.checked;
-  });
-  all.views = [{ state: 'frozen', ySplit: 1 }];
-  all.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(2, sorted.length + 1), column: allHeads.length } };
-
-  const sheetName = (base) => { let n = base.slice(0, 31), i = 2; while (names.has(n)) n = base.slice(0, 27) + ' ' + i++; names.add(n); return n; };
   const money = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@';
+  const sheetName = (base) => { let n = base.slice(0, 31), i = 2; while (names.has(n)) n = base.slice(0, 27) + ' ' + i++; names.add(n); return n; };
+  if (rows.length) {
+    /* One master sheet with every receipt: filter by date, name or TIN, or search with Ctrl+F. */
+    const all = wb.addWorksheet('ALL RECEIPTS');
+    names.add('ALL RECEIPTS');
+    const allHeads = ['DATE','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS AMOUNT','VAT / NON-VAT','DOCUMENT TYPE','SOURCE FILE','CHECKED'];
+    allHeads.forEach((h, i) => {
+      const c = all.getCell(1, i + 1);
+      c.value = h; c.font = { name: 'Calibri', size: 12, bold: true };
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7EFEA' } };
+    });
+    [12,16,17,41,36,16,14,18,30,10].forEach((w, i) => { all.getColumn(i + 1).width = w; });
+    const sorted = rows.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+    sorted.forEach((r, i) => {
+      const n = 2 + i, p = parseDate(r.date);
+      const dc = all.getCell(n, 1);
+      if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm/dd/yyyy'; } else dc.value = r.date;
+      all.getCell(n, 2).value = r.doc_no;
+      all.getCell(n, 3).value = r.tin;
+      all.getCell(n, 4).value = r.name;
+      all.getCell(n, 5).value = r.address;
+      const g = all.getCell(n, 6); g.value = r.total; g.numFmt = '#,##0.00';
+      all.getCell(n, 7).value = r.vat_type;
+      all.getCell(n, 8).value = r.doc_type;
+      all.getCell(n, 9).value = r.source;
+      all.getCell(n, 10).value = r.checked;
+    });
+    all.views = [{ state: 'frozen', ySplit: 1 }];
+    all.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(2, sorted.length + 1), column: allHeads.length } };
 
-  for (const key of keys) {
-    const rs = groups.get(key);
-    let label;
-    if (key === 'UNDATED') label = 'UNDATED';
-    else { const [y, mo] = key.split('-'); label = MONTHS[+mo - 1] + (new Set(keys.filter(k => k !== 'UNDATED').map(k => k.slice(0,4))).size > 1 ? ' ' + y : ''); }
-    for (const kind of ['VAT', 'NON-VAT']) {
-      const ws = wb.addWorksheet(sheetName(label + (kind === 'VAT' ? ' PUR-VAT' : ' PUR-NONVAT')));
-      const heads = kind === 'VAT'
-        ? ['DATE ','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS TAXABLE ','INPUT TAX','VATABLE PURCHASES','TOTAL PURCHASES']
-        : ['DATE ','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS TAXABLE '];
-      heads.forEach((h, i) => {
-        const col = String.fromCharCode(65 + i);
-        ws.mergeCells(`${col}1:${col}2`);
-        const c = ws.getCell(`${col}1`);
-        c.value = h; c.font = { name: 'Calibri', size: 12, bold: true };
-        c.alignment = { horizontal: 'center', vertical: 'middle' };
-      });
-      [['A',12],['B',16],['C',17],['D',41],['E',36],['F',18],['G',14],['H',20],['I',18]].forEach(([c, w]) => { ws.getColumn(c).width = w; });
-      const mine = rs.filter(r => r.vat_type === kind).sort((a, b) => a.date.localeCompare(b.date));
-      mine.forEach((r, i) => {
-        const n = 3 + i, p = parseDate(r.date);
-        const dc = ws.getCell(`A${n}`);
-        if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm-dd-yy'; } else dc.value = r.date;
-        ws.getCell(`B${n}`).value = r.doc_no;
-        ws.getCell(`C${n}`).value = r.tin;
-        ws.getCell(`D${n}`).value = r.name;
-        ws.getCell(`E${n}`).value = r.address;
-        const f = ws.getCell(`F${n}`); f.value = r.total; f.numFmt = money;
-        if (kind === 'VAT') {
-          const h = r.total == null ? 0 : r.total * 100 / 112, g = h * 0.12;
-          ws.getCell(`G${n}`).value = { formula: `H${n}*0.12`, result: g };
-          ws.getCell(`H${n}`).value = { formula: `F${n}*100/112`, result: h };
-          ws.getCell(`I${n}`).value = { formula: `G${n}+H${n}`, result: g + h };
-          ['G','H','I'].forEach(c => { ws.getCell(`${c}${n}`).numFmt = money; });
-        }
-      });
+
+    for (const key of keys) {
+      const rs = groups.get(key);
+      let label;
+      if (key === 'UNDATED') label = 'UNDATED';
+      else { const [y, mo] = key.split('-'); label = MONTHS[+mo - 1] + (new Set(keys.filter(k => k !== 'UNDATED').map(k => k.slice(0,4))).size > 1 ? ' ' + y : ''); }
+      for (const kind of ['VAT', 'NON-VAT']) {
+        const ws = wb.addWorksheet(sheetName(label + (kind === 'VAT' ? ' PUR-VAT' : ' PUR-NONVAT')));
+        const heads = kind === 'VAT'
+          ? ['DATE ','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS TAXABLE ','INPUT TAX','VATABLE PURCHASES','TOTAL PURCHASES']
+          : ['DATE ','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS TAXABLE '];
+        heads.forEach((h, i) => {
+          const col = String.fromCharCode(65 + i);
+          ws.mergeCells(`${col}1:${col}2`);
+          const c = ws.getCell(`${col}1`);
+          c.value = h; c.font = { name: 'Calibri', size: 12, bold: true };
+          c.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+        [['A',12],['B',16],['C',17],['D',41],['E',36],['F',18],['G',14],['H',20],['I',18]].forEach(([c, w]) => { ws.getColumn(c).width = w; });
+        const mine = rs.filter(r => r.vat_type === kind).sort((a, b) => a.date.localeCompare(b.date));
+        mine.forEach((r, i) => {
+          const n = 3 + i, p = parseDate(r.date);
+          const dc = ws.getCell(`A${n}`);
+          if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm-dd-yy'; } else dc.value = r.date;
+          ws.getCell(`B${n}`).value = r.doc_no;
+          ws.getCell(`C${n}`).value = r.tin;
+          ws.getCell(`D${n}`).value = r.name;
+          ws.getCell(`E${n}`).value = r.address;
+          const f = ws.getCell(`F${n}`); f.value = r.total; f.numFmt = money;
+          if (kind === 'VAT') {
+            const h = r.total == null ? 0 : r.total * 100 / 112, g = h * 0.12;
+            ws.getCell(`G${n}`).value = { formula: `H${n}*0.12`, result: g };
+            ws.getCell(`H${n}`).value = { formula: `F${n}*100/112`, result: h };
+            ws.getCell(`I${n}`).value = { formula: `G${n}+H${n}`, result: g + h };
+            ['G','H','I'].forEach(c => { ws.getCell(`${c}${n}`).numFmt = money; });
+          }
+        });
+      }
     }
+  }
+
+  /* Sales: one sheet per month in the office's ESALES layout (main branch first, then BRANCH), plus a master list. */
+  if (sales.length) {
+    const sorted = sales.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.branch.localeCompare(b.branch));
+    const sg = new Map();
+    for (const r of sorted) {
+      const p = parseDate(r.date);
+      const key = p ? `${p.y}-${String(p.mo).padStart(2,'0')}` : 'UNDATED';
+      if (!sg.has(key)) sg.set(key, []);
+      sg.get(key).push(r);
+    }
+    const heads = ['DATE','TIN','Branch','Month','Year','MIN','Last OR','Vatable Sales','Vat Amount ','Vat Zero Rated Sales','Vat Exempt Sales','Sales Subject to other percentage taxes','REMARKS ','TOTAL'];
+    const widths = [8,16,9,14,8,22,14,18,16,18,18,22,24,16];
+    const bold = { name: 'Calibri', size: 12, bold: true };
+    const mid = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    const total = r => (r.vatable_sales || 0) + (r.vat_amount || 0) + (r.zero_rated || 0) + (r.vat_exempt || 0);
+    const writeRow = (ws, n, r) => {
+      const p = parseDate(r.date);
+      ws.getCell(`A${n}`).value = p ? p.d : r.date;
+      ws.getCell(`B${n}`).value = r.tin;
+      ws.getCell(`C${n}`).value = r.branch;
+      ws.getCell(`D${n}`).value = p ? MONTHS[p.mo - 1] : '';
+      ws.getCell(`E${n}`).value = p ? p.y : '';
+      ws.getCell(`F${n}`).value = r.min;
+      ws.getCell(`G${n}`).value = r.last_or;
+      [['H', r.vatable_sales], ['I', r.vat_amount], ['J', r.zero_rated], ['K', r.vat_exempt]].forEach(([c, v]) => {
+        const cell = ws.getCell(`${c}${n}`); cell.value = v; cell.numFmt = money;
+      });
+      ws.getCell(`M${n}`).value = r.remarks;
+      const t = ws.getCell(`N${n}`); t.value = { formula: `H${n}+I${n}+J${n}+K${n}`, result: total(r) }; t.numFmt = money;
+    };
+    for (const key of [...sg.keys()].sort()) {
+      const rs = sg.get(key);
+      const p0 = key === 'UNDATED' ? null : { y: +key.slice(0, 4), mo: +key.slice(5) };
+      const ws = wb.addWorksheet(sheetName(p0 ? MONTHS[p0.mo - 1] + ' ' + p0.y : 'UNDATED SALES'));
+      heads.forEach((h, i) => { const c = ws.getCell(1, i + 1); c.value = h; c.font = bold; c.alignment = mid; ws.getColumn(i + 1).width = widths[i]; });
+      ws.getRow(1).height = 48;
+      const main = rs.filter(r => r.branch === '000'), br = rs.filter(r => r.branch !== '000');
+      let n = 3;
+      main.forEach(r => { writeRow(ws, n++, r); });
+      if (br.length) {
+        n += 1;
+        ws.mergeCells(`A${n}:N${n + 1}`);
+        const b = ws.getCell(`A${n}`); b.value = 'BRANCH'; b.font = bold; b.alignment = { horizontal: 'center', vertical: 'middle' };
+        n += 3;
+        br.forEach(r => { writeRow(ws, n++, r); });
+      }
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+    }
+    const zs = wb.addWorksheet(sheetName('ALL Z-READINGS'));
+    const zh = ['DATE','TIN','BRANCH','REGISTERED NAME','MIN','LAST OR','VATABLE SALES','VAT AMOUNT','ZERO RATED','VAT EXEMPT','TOTAL','NET SALES (READ)','REMARKS','SOURCE FILE','CHECKED'];
+    zh.forEach((h, i) => {
+      const c = zs.getCell(1, i + 1); c.value = h; c.font = bold; c.alignment = mid;
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7EFEA' } };
+      zs.getColumn(i + 1).width = [12,16,9,34,22,14,16,14,14,14,16,18,22,30,10][i];
+    });
+    sorted.forEach((r, i) => {
+      const n = 2 + i, p = parseDate(r.date), dc = zs.getCell(n, 1);
+      if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm/dd/yyyy'; } else dc.value = r.date;
+      zs.getCell(n, 2).value = r.tin; zs.getCell(n, 3).value = r.branch; zs.getCell(n, 4).value = r.name;
+      zs.getCell(n, 5).value = r.min; zs.getCell(n, 6).value = r.last_or;
+      [r.vatable_sales, r.vat_amount, r.zero_rated, r.vat_exempt].forEach((v, j) => { const c = zs.getCell(n, 7 + j); c.value = v; c.numFmt = money; });
+      const t = zs.getCell(n, 11); t.value = { formula: `G${n}+H${n}+I${n}+J${n}`, result: total(r) }; t.numFmt = money;
+      const nt = zs.getCell(n, 12); nt.value = r.net_sales; nt.numFmt = money;
+      zs.getCell(n, 13).value = r.remarks; zs.getCell(n, 14).value = r.source; zs.getCell(n, 15).value = r.checked;
+    });
+    zs.views = [{ state: 'frozen', ySplit: 1 }];
+    zs.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(2, sorted.length + 1), column: zh.length } };
   }
   const t = wb.addWorksheet('TRIAL');
   t.getCell('A1').value = 'TRIAL VERSION'; t.getCell('A1').font = { bold: true, size: 14 };
@@ -661,10 +837,10 @@ function saveBlob(blob, filename){
 
 $('expBtn').onclick = async () => {
   if (!window.ExcelJS) { setMsg('The Excel library did not load. Reload the page, or use Copy rows.'); return; }
-  const rows = rowsFromReceipts(receipts);
-  if (!rows.length) return;
+  const rows = rowsFromReceipts(receipts), sales = salesFromReceipts(receipts);
+  if (!rows.length && !sales.length) return;
   try {
-    const wb = buildWorkbook(ExcelJS, rows, CONTACT);
+    const wb = buildWorkbook(ExcelJS, rows, CONTACT, sales);
     const buf = await wb.xlsx.writeBuffer();
     saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'TRIAL_receipts_' + new Date().toISOString().slice(0,10) + '.xlsx');
     const un = receipts.filter(needsAttention).length;
@@ -673,11 +849,19 @@ $('expBtn').onclick = async () => {
 };
 
 $('copyBtn').onclick = async () => {
-  const rows = rowsFromReceipts(receipts);
-  if (!rows.length) return;
-  const cols = ['DATE','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS TAXABLE','VAT / NON-VAT'];
+  const rows = rowsFromReceipts(receipts), sales = salesFromReceipts(receipts);
+  if (!rows.length && !sales.length) return;
   const clean = v => String(v ?? '').replace(/[\t\n]/g, ' ');
-  const tsv = [cols.join('\t'), ...rows.map(r => [r.date, r.doc_no, r.tin, r.name, r.address, r.total ?? '', r.vat_type].map(clean).join('\t'))].join('\n');
+  const blocks = [];
+  if (rows.length) {
+    const cols = ['DATE','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS TAXABLE','VAT / NON-VAT'];
+    blocks.push([cols.join('\t'), ...rows.map(r => [r.date, r.doc_no, r.tin, r.name, r.address, r.total ?? '', r.vat_type].map(clean).join('\t'))].join('\n'));
+  }
+  if (sales.length) {
+    const cols = ['DATE','TIN','BRANCH','MIN','LAST OR','VATABLE SALES','VAT AMOUNT','ZERO RATED','VAT EXEMPT','REMARKS'];
+    blocks.push([cols.join('\t'), ...sales.map(r => [r.date, r.tin, r.branch, r.min, r.last_or, r.vatable_sales ?? '', r.vat_amount ?? '', r.zero_rated ?? '', r.vat_exempt ?? '', r.remarks].map(clean).join('\t'))].join('\n'));
+  }
+  const tsv = blocks.join('\n\n');
   try { await navigator.clipboard.writeText(tsv); setMsg('Copied. Paste into Excel or Google Sheets.'); }
   catch(e) { setMsg('Copy was blocked here. Use Export to Excel instead.'); }
 };

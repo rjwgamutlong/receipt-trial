@@ -1,0 +1,1368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Receipt to Excel (Trial)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f1f3ee;--surface:#ffffff;--ink:#1b2724;--muted:#5b6a66;--line:#d8ddd5;
+    --accent:#1c6a56;--accent-ink:#ffffff;--accent-soft:#e0f1e9;
+    --amber:#b9792b;--flag:#fff0a3;--flag-line:#d4b000;--flag-ink:#2b2500;
+    --bad:#a8261f;--bad-bg:#fbe8e5;--ok:#1c6a56;
+    --font:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+    --bg:#101715;--surface:#18211e;--ink:#e5ece9;--muted:#9bada8;--line:#2b3834;
+    --accent:#4fc3a3;--accent-ink:#082019;--accent-soft:#15332a;
+    --amber:#e0a257;--flag:#4b4310;--flag-line:#c7a800;--flag-ink:#ffe98a;
+    --bad:#ff9087;--bad-bg:#3b1b18;--ok:#72d6b7;color-scheme:dark}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;
+    padding:0 max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+  body::before{content:"TRIAL VERSION";position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:min(14vw,120px);font-weight:700;letter-spacing:.08em;color:var(--ink);opacity:.04;
+    transform:rotate(-24deg);pointer-events:none;z-index:50;white-space:nowrap}
+  .wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column}
+  .wrap>.top{order:0}.wrap>#navWrap{order:1}.wrap>#gate,.wrap>#locked,.wrap>#app{order:2}
+  button{font:inherit;cursor:pointer}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  select,input[type=search],input[type=text]{font:inherit;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 9px;min-width:0}
+  .btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:8px 14px;font-weight:600}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+  .btn.small{padding:4px 10px;font-size:12px;font-weight:500}
+  .btn:disabled{opacity:.45;cursor:default}
+  .badge{display:inline-block;margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:99px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line);vertical-align:middle}
+  .top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:16px 0 12px}
+  .brand{display:flex;gap:12px;align-items:center}.brand .logo{width:44px;height:44px;border-radius:8px;flex:none;object-fit:contain}
+  .brand b{font-size:18px;letter-spacing:-.01em}.brand span.s{display:block;color:var(--muted);font-size:12px}
+  .ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ctl label{color:var(--muted);font-size:12px}
+  #trialBar{margin-bottom:12px;padding:8px 12px;border-radius:6px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line);font-size:13px}
+  #warnBar{margin-bottom:12px;padding:8px 12px;border-radius:6px;background:var(--bad-bg);color:var(--bad);font-size:13px}
+  nav{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:16px}
+  nav button{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:9px 11px;font-weight:600;margin-bottom:-1px}
+  nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+  nav .n{display:inline-block;min-width:18px;text-align:center;margin-left:6px;font-size:11px;border-radius:99px;padding:0 6px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+  h2{margin:0;font-size:15px}.note{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10.5rem),1fr));gap:12px}
+  .tile .l{color:var(--muted);font-size:12px}.tile b{display:block;font-family:var(--mono);font-weight:500;font-size:22px;margin-top:4px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));gap:12px;margin-top:12px}
+  .tw{overflow:auto;max-height:30rem;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th{position:sticky;top:0;background:var(--surface);text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer}
+  td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .mono,td.n,th.n{font-family:var(--mono)}td.n,th.n{text-align:right}
+  tbody tr{cursor:pointer}tbody tr:hover{background:var(--accent-soft)}tbody tr.sel{background:var(--accent-soft)}
+  .pill{display:inline-block;border-radius:99px;padding:1px 8px;border:1px solid var(--line);font-size:11.5px}
+  .pill.ok{color:var(--ok)}.pill.bad{color:var(--bad);background:var(--bad-bg);border-color:transparent}
+  .stat{display:inline-block;border-radius:99px;padding:1px 9px;font-size:11.5px;border:1px solid var(--line)}
+  .stat.go{background:var(--accent-soft);color:var(--ok);border-color:transparent}.stat.wip{background:var(--flag);color:var(--flag-ink);border-color:var(--flag-line)}
+  .stat.none{color:var(--muted)}.stat.lock{background:var(--ink);color:var(--bg);border-color:transparent}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+  .bar input[type=search]{flex:1;min-width:12rem}.count{color:var(--muted);font-size:12px}
+  .split{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:12px;align-items:start}
+  @media (max-width:860px){.split{grid-template-columns:1fr}}
+  .drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;background:var(--surface)}
+  .drop.over{border-color:var(--accent)}
+  .drop .h{flex:1;min-width:14rem}.drop .h b{display:block;font-size:15px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .seg button{background:transparent;border:0;padding:6px 12px;color:var(--muted);font-weight:600}.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+  .q{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+  .qi{display:flex;gap:12px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+  .qi .th{width:44px;height:58px;overflow:hidden;border-radius:4px;border:1px solid var(--line);flex:none;background:var(--bg)}
+  .qi .th img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+  .qi .t{flex:1;min-width:0}.qi .t b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.qi .t span{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+  .dots{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:sp 1s linear infinite;display:inline-block;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.dots{animation:none}}
+  .photo{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;justify-content:center;overflow:auto;max-height:80vh}
+  .photo img{max-width:100%;height:auto;display:block;border-radius:2px}
+  .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}.fields .w{grid-column:span 2}
+  .fields label{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .fields input,.fields select{width:100%}.fields .warn{background:var(--flag);border-color:var(--flag-line);color:var(--flag-ink)}
+  .fields input.num{font-family:var(--mono);text-align:right}
+  .msgbox{margin-top:10px;padding:8px 10px;border-radius:6px;font-size:12.5px}.msgbox.bad{background:var(--bad-bg);color:var(--bad)}.msgbox.ok{background:var(--accent-soft);color:var(--ok)}.msgbox.warn{background:var(--flag);color:var(--flag-ink)}
+  .ack{display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px}
+  .legend{display:flex;gap:14px;color:var(--muted);font-size:12px;margin:8px 0 2px}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+  .empty{color:var(--muted);padding:22px;text-align:center}
+  .sheets{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.sheet{border:1px solid var(--line);border-radius:6px 6px 0 0;padding:4px 10px;font-size:12px;background:var(--bg);color:var(--muted)}.sheet.on{background:var(--surface);color:var(--ink);font-weight:600}
+  .log div{display:grid;grid-template-columns:9.5rem 8rem minmax(0,1fr);gap:10px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px}.log .t,.log .u{color:var(--muted)}
+  @media (max-width:640px){.log div{grid-template-columns:1fr}}
+  .dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;font-size:12.5px}.dl dt{color:var(--muted)}.dl dd{margin:0;overflow-wrap:anywhere}
+  .toast{z-index:80;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;max-width:calc(100% - 32px);font-size:13px}
+  .toast[hidden],[hidden]{display:none!important}
+  #gate,#locked{margin-top:22px;padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-width:520px}
+  #gate h2,#locked h2{font-size:17px;margin:0 0 6px}#gate p,#locked p{margin:0 0 12px;color:var(--muted)}
+  #gate .row2{display:flex;gap:8px}#gate .row2 input{flex:1}
+  #gateErr{margin-top:8px;color:var(--bad);min-height:18px;font-size:13px}#locked a{color:var(--accent);font-weight:600}
+  #guide{margin-top:16px;max-width:640px}
+  .gcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .gtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.gstep{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .gdots{display:flex;gap:5px}.gdots i{width:8px;height:8px;border-radius:50%;background:var(--line)}.gdots i.on{background:var(--accent)}
+  .gcard h2{font-size:19px;margin:4px 0 10px}.gbody{font-size:15px;line-height:1.55;margin-bottom:14px}.gbody p{margin:0 0 10px}.gbody ul,.gbody ol{margin:0 0 10px;padding-left:20px}.gbody li{margin-bottom:6px}
+  .gbody .tip{background:var(--accent-soft);border-radius:8px;padding:9px 12px;font-size:14px}.gbody .stop{background:var(--flag);color:var(--flag-ink);border-radius:8px;padding:9px 12px;font-size:14px}
+  .manual .card{margin-bottom:12px}.manual h2{font-size:16px;margin-bottom:6px}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
+  .tgrid .cell{padding:8px 10px;border:1px solid var(--line);border-radius:6px}.tgrid .cell span{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .tgrid .cell strong{font-family:var(--mono);font-size:18px;font-weight:500}.tgrid input{margin-top:3px;width:100%}
+  .ls{display:none}
+  .onlym{display:none}
+  #navBtn{display:none}
+  .ts{display:none}
+  @media (max-width:640px){
+    body{font-size:14px}
+    .ctl#topctl{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    #topctl label{display:none}#topctl #cli{grid-column:1 / -1;width:100%}#topctl select,#topctl .btn,#topctl input{width:100%;min-height:40px}
+    .top{display:contents}
+    .brand{order:-2;padding:12px 0 8px}.brand .logo{width:38px;height:38px}.brand b{font-size:16px}.brand span.s{display:none}
+    .wrap>#topctl{order:0;margin-bottom:8px}
+    .ctl#topctl{grid-template-columns:1fr 1fr}
+    #topctl #cli{grid-column:auto}#topctl #usr{display:none}#topctl #nm{grid-column:1 / -1}#topctl #nmSave{grid-column:1 / -1}
+    nav .onlym{display:flex;color:var(--muted);font-weight:500}
+    .tw{overflow:visible;max-height:none;border:0;background:transparent;border-radius:0}
+    .tw table,.tw tbody{display:block;width:100%}.tw thead{display:none}
+    .tw tr{display:block;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px}
+    .tw tr.sel{border-color:var(--accent);background:var(--accent-soft)}
+    .tw td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:3px 0;border:0;white-space:normal;text-align:right;overflow-wrap:anywhere}
+    .tw td::before{content:attr(data-l);color:var(--muted);font-size:12px;text-align:left;flex:none}
+    .tw td.ttl{font-weight:600;text-align:left;padding-bottom:5px}.tw td.ttl::before{content:none}
+    .tw td.hm{display:none}.tw td.empty{display:block;text-align:center}.tw td.empty::before{content:none}
+    .nom{display:none}
+    .detail{position:fixed;inset:0;z-index:70;overflow:auto;border-radius:0;border:0;padding:0 16px 30px;background:var(--surface)}
+    .detail>.bar:first-child{position:sticky;top:0;background:var(--surface);padding:10px 0;margin:0 0 6px;z-index:1;border-bottom:1px solid var(--line)}
+    .detail .photo{max-height:none}
+    .bar select{flex:1 1 100%}
+    .fields.one{grid-template-columns:1fr}.fields.one .w{grid-column:auto}
+    #trialBar{font-size:12px;padding:6px 10px;margin-bottom:8px}
+    .wrap>#navWrap{order:-1}
+    #navWrap{position:sticky;top:0;z-index:45;background:var(--bg);margin:0 -16px 10px;padding:6px 16px;border-bottom:1px solid var(--line)}
+    #navBtn{display:flex;width:100%;align-items:center;gap:12px;min-height:46px;padding:0 12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;font:inherit;font-weight:600;font-size:16px;text-align:left}
+    #navBtn .ic{width:22px;height:16px;position:relative;flex:none;border-top:2px solid currentColor;border-bottom:2px solid currentColor}
+    #navBtn .ic::after{content:"";position:absolute;left:0;right:0;top:50%;margin-top:-1px;border-top:2px solid currentColor}
+    #navBtn .tx{flex:1}
+    nav{display:none;position:absolute;left:16px;right:16px;top:calc(100% - 2px);flex-direction:column;gap:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;margin:0}
+    nav.open{display:flex}
+    nav button{width:100%;text-align:left;padding:12px 14px;font-size:16px;min-height:48px;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;display:flex;justify-content:space-between;align-items:center;color:var(--ink)}
+    nav button:last-child{border-bottom:0}
+    nav button[aria-selected=true]{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+    nav .n{margin-left:8px;padding:0 7px}
+    .ts{display:inline}.tf{display:none}
+    .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{padding:12px}
+    .tile .l{font-size:11.5px}.tile b{font-size:18px;margin-top:2px}
+    .photo{max-height:42vh}
+    .drop{padding:12px}.drop .h{min-width:0;flex-basis:100%}.drop .btn{flex:1 1 40%}
+    .qi{flex-wrap:wrap}.qi .t{flex-basis:calc(100% - 60px)}
+    .btn{min-height:40px}.btn.small{min-height:34px}
+    .fields input,.fields select{min-height:40px;font-size:16px}
+    select,input[type=search],input[type=text]{font-size:16px}
+    .bar input[type=search]{min-width:100%}
+    th,td{padding:7px 8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="navWrap" hidden><button id="navBtn" aria-expanded="false" aria-controls="nav" aria-label="Menu"></button>
+    <nav role="tablist" aria-label="Sections" id="nav"></nav></div>
+  <div class="top">
+    <div class="brand"><img class="logo" src="https://cdn.jsdelivr.net/gh/rjwgamutlong/receipt-trial@2dff328394de326231d886ac53bad9f1fb7d3331/public/jadj-logo.png" alt="JADJ Business Solutions Inc." width="44" height="44"><div><b>Receipt to Excel <span class="badge">TRIAL</span></b><span class="s">JADJ Business Solutions Inc. · receipts and Z-Readings into your own Excel formats</span></div></div>
+    <div class="ctl" id="topctl" hidden></div>
+  </div>
+
+  <section id="gate">
+    <h2>Enter your trial code</h2>
+    <p>The trial code was sent to you by Blyss Digital. To read a receipt, its photo is sent to an outside reading service. Nothing is saved on our server: your clients, records and scans are kept only in this browser, on this computer.</p>
+    <div class="row2"><input type="text" id="codeIn" placeholder="Trial code" autocomplete="off" aria-label="Trial code"><button class="btn" id="codeBtn">Start</button></div>
+    <div id="gateErr" role="alert"></div>
+  </section>
+
+  <section id="guide" hidden aria-labelledby="gTitle">
+    <div class="gcard">
+      <div class="gtop"><span class="gstep" id="gStep"></span><span class="gdots" id="gDots" aria-hidden="true"></span></div>
+      <h2 id="gTitle"></h2>
+      <div id="gBody" class="gbody"></div>
+      <label class="ack" id="gAckRow" hidden><input type="checkbox" id="gAck"> I have read this manual and I understand that I must check every record before using it.</label>
+      <div class="bar" style="margin-bottom:0"><button class="btn ghost" id="gBack">Back</button><span style="flex:1"></span><button class="btn" id="gNext">Next</button></div>
+    </div>
+  </section>
+
+  <section id="locked" hidden>
+    <h2 id="lockTitle">Your trial has ended</h2>
+    <p id="lockText"></p>
+    <p>To continue, contact Blyss Digital:<br><a id="lockMail" href="#"></a><br><a id="lockPhone" href="#"></a></p>
+    <p>Your records stay in this browser. You can still open the Backup tab after you reload the page and enter the code again only if the trial is still active, so download a backup before the trial ends.</p>
+  </section>
+
+  <div id="app" hidden>
+    <div id="trialBar"></div>
+    <div id="warnBar" hidden></div>
+    
+    <main id="view"></main>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<input type="file" id="file" accept="image/*,application/pdf" multiple hidden>
+<input type="file" id="cam" accept="image/*" capture="environment" hidden>
+<input type="file" id="restoreFile" accept="application/json,.json" hidden>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+/* ---- Edit these before you send the link ---- */
+const CONTACT = { name: 'Blyss Digital', email: 'rayann.catindig@gmail.com', phone: '+63 976 148 3535' };
+const ENDPOINT = /netlify\.app$/.test(location.hostname) ? '/.netlify/functions/read-receipt' : '/api/read-receipt';
+/* --------------------------------------------- */
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const num = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/[,\s]|PHP|₱/gi,'')); return isNaN(n) ? null : n; };
+const peso = v => '₱' + Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const compact = v => '₱' + new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 2 }).format(v || 0);
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const validDate = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '').trim());
+const dl = s => validDate(s) ? MON[+s.slice(5,7) - 1] + ' ' + (+s.slice(8)) + ', ' + s.slice(0,4) : (s || 'no date');
+const ml = ym => ym && ym !== 'UNDATED' ? MON[+ym.slice(5,7) - 1] + ' ' + ym.slice(0,4) : 'No date';
+const monthOf = r => validDate(r.date) ? r.date.slice(0,7) : 'UNDATED';
+const digits = s => String(s || '').replace(/\D/g, '');
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const IMG_MAX = 3, MAX_PDF_PAGES = 60;
+
+/* ---------- storage: everything stays in this browser ---------- */
+let db = null, persistOn = false;
+const MEMSCANS = new Map();
+function openDb(){
+  return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error('no indexedDB'));
+    const q = indexedDB.open('blyss-firm', 1);
+    q.onupgradeneeded = () => { const d = q.result; d.createObjectStore('clients', { keyPath: 'id' }); d.createObjectStore('records', { keyPath: 'id' }); d.createObjectStore('scans'); d.createObjectStore('log', { autoIncrement: true }); d.createObjectStore('meta'); };
+    q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+  });
+}
+const rq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const store = (s, m = 'readonly') => db.transaction(s, m).objectStore(s);
+const dbAll = s => db ? rq(store(s).getAll()) : Promise.resolve([]);
+const dbPut = (s, v, k) => db ? rq(k === undefined ? store(s, 'readwrite').put(v) : store(s, 'readwrite').put(v, k)).catch(onSaveFail) : Promise.resolve();
+const dbAdd = (s, v) => db ? rq(store(s, 'readwrite').add(v)).catch(onSaveFail) : Promise.resolve();
+const dbGet = (s, k) => db ? rq(store(s).get(k)) : Promise.resolve(undefined);
+const dbDel = (s, k) => db ? rq(store(s, 'readwrite').delete(k)).catch(onSaveFail) : Promise.resolve();
+const dbClear = s => db ? rq(store(s, 'readwrite').clear()) : Promise.resolve();
+function onSaveFail(){ warn('Saving failed. The browser may be out of space. Download a backup now and free some space.'); }
+function warn(t){ const b = $('#warnBar'); b.textContent = t; b.hidden = !t; }
+const putScan = (id, blob) => { if (!db) MEMSCANS.set(id, blob); return dbPut('scans', blob, id); };
+const getScan = async id => MEMSCANS.get(id) || await dbGet('scans', id);
+const URLS = new Map();
+async function scanUrl(id){ if (URLS.has(id)) return URLS.get(id); const b = await getScan(id); if (!b) return ''; const u = URL.createObjectURL(b); URLS.set(id, u); return u; }
+async function hydrate(){ document.querySelectorAll('img[data-scan]').forEach(async im => { const u = await scanUrl(im.dataset.scan); if (u && im.isConnected) im.src = u; }); }
+
+/* ---------- state ---------- */
+let CL = [], REC = [], LOG = [], SIGN = {}, USER = 'Staff';
+let code = '', trial = { remaining: 0, max: 0, expires: null };
+const PARTS = new Map();
+const st = { tab: 'dashboard', client: '', month: '', kind: 'purchase', uclient: '', sel: null, review: null, psort: ['date', -1], ssort: ['date', -1], f: {}, xs: 0, editing: null, confirm: '', nameEdit: false, running: false, stopped: false, tManual: '3', tCheck: '1' };
+const cname = id => (CL.find(c => c.id === id) || {}).name || 'Unknown client';
+const clientOf = id => CL.find(c => c.id === id);
+const approved = r => r.state === 'approved';
+const recs = kind => REC.filter(r => r.kind === kind);
+const months = () => { const s = new Set(REC.filter(approved).map(monthOf).filter(m => m !== 'UNDATED')); s.add(nowMonth()); return [...s].sort(); };
+const nowMonth = () => new Date().toISOString().slice(0, 7);
+const curMonth = () => { if (st.month) return st.month; const d = REC.map(monthOf).filter(m => m !== 'UNDATED').sort(); return d.length ? d[d.length - 1] : nowMonth(); };
+const inMonth = r => !st.month || monthOf(r) === st.month;
+const inClient = r => !st.client || r.client === st.client;
+const signKey = (c, m) => c + '|' + m, signOf = (c, m) => SIGN[signKey(c, m)] || 'open';
+const saleTotal = r => +((num(r.vatable_sales) || 0) + (num(r.vat_amount) || 0) + (num(r.zero_rated) || 0) + (num(r.vat_exempt) || 0)).toFixed(2);
+function toast(t){ const e = $('#toast'); e.textContent = t; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, 3600); }
+async function log(act, client){
+  const d = new Date();
+  const e = { t: MON[d.getMonth()] + ' ' + d.getDate() + ', ' + d.toLocaleTimeString('en', { hour: 'numeric', minute: '2-digit' }), who: USER, client: client || '', act };
+  LOG.unshift(e); await dbAdd('log', e);
+}
+const saveRec = r => dbPut('records', r);
+const saveSign = () => dbPut('meta', SIGN, 'sign');
+
+/* ---------- trial gate ---------- */
+const ERR = {
+  bad_code: 'That trial code is not correct.',
+  busy: 'The reading service is busy right now (this is on the provider side and usually clears in a minute). Press Retry.',
+  upstream: 'Connection problem. Press Retry.',
+  invalid_json: 'The answer was not in the expected format. Press Retry.',
+  too_big: 'This photo is too large. Try a smaller photo.',
+  bad_images: 'This image could not be used. Try another photo (JPG or PNG).',
+  server_setup: 'The trial is not set up yet. Please contact Blyss Digital.'
+};
+function showLocked(kind){
+  $('#gate').hidden = true; $('#guide').hidden = true; $('#app').hidden = true; $('#topctl').hidden = true; $('#navWrap').hidden = true; $('#locked').hidden = false;
+  $('#lockTitle').textContent = kind === 'limit' ? 'Trial receipts used up' : 'Your trial has ended';
+  $('#lockText').textContent = kind === 'limit' ? 'You have used all the receipts included in this trial.' : 'The trial period is over.';
+  $('#lockMail').href = 'mailto:' + CONTACT.email; $('#lockMail').textContent = CONTACT.email;
+  $('#lockPhone').href = 'tel:' + CONTACT.phone.replace(/\s/g, ''); $('#lockPhone').textContent = CONTACT.phone;
+}
+function paintTrial(){ const d = trial.expires ? ' Trial ends ' + trial.expires + '.' : ''; $('#trialBar').innerHTML = `<span class="tf">Trial: ${trial.remaining} of ${trial.max} receipts left.${d} Records are kept in this browser only, so download a backup now and then.</span><span class="ts">Trial: ${trial.remaining} of ${trial.max} left${trial.expires ? ' · ends ' + trial.expires : ''}</span>`; }
+async function callApi(payload, signal){
+  let res;
+  try { res = await fetch(ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal }); }
+  catch (e) { if (e.name === 'AbortError') throw { code: 'cancelled' }; throw { code: 'upstream', info: { detail: 'no connection to the server, check the phone signal' } }; }
+  let data = {}, bad = false; try { data = await res.json(); } catch (e) { bad = true; }
+  if (!res.ok) throw { code: data.error || 'upstream', info: bad ? { detail: 'server answered HTTP ' + res.status + (res.status === 504 || res.status === 502 ? ' (took too long)' : '') } : data };
+  return data;
+}
+async function tryCode(c){
+  $('#gateErr').textContent = '';
+  try {
+    const s = await callApi({ code: c, action: 'status' });
+    code = c; trial = s;
+    try { localStorage.setItem('trialCode', c); } catch (e) {}
+    await startApp();
+  } catch (e) {
+    if (e.code === 'expired' || e.code === 'limit') { showLocked(e.code); return; }
+    $('#gateErr').textContent = ERR[e.code] || 'Could not check the code. Try again.';
+    try { localStorage.removeItem('trialCode'); } catch (_) {}
+  }
+}
+$('#codeBtn').onclick = () => { const v = $('#codeIn').value.trim(); if (v) tryCode(v); };
+$('#codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('#codeBtn').click(); });
+
+async function startApp(){
+  if (!db) {
+    try { db = await openDb(); persistOn = true; } catch (e) { db = null; persistOn = false; }
+    if (db) {
+      CL = await dbAll('clients'); REC = await dbAll('records'); LOG = (await dbAll('log')).reverse();
+      SIGN = (await dbGet('meta', 'sign')) || {}; USER = (await dbGet('meta', 'user')) || 'Staff';
+      REC.forEach(r => { if (r.state === 'reading') r.state = 'queued'; });
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+    }
+  }
+  if (!guideDone()) { showGuide(); return; }
+  enterApp();
+}
+function enterApp(){
+  $('#gate').hidden = true; $('#locked').hidden = true; $('#guide').hidden = true; $('#app').hidden = false; $('#topctl').hidden = false; $('#navWrap').hidden = false;
+  if (!persistOn) warn('This browser window cannot save records (private window?). Everything will be lost when you close it. Open the page in a normal window to keep your work.');
+  paintTrial(); draw();
+  if (REC.some(r => r.state === 'queued')) { toast('Some files were still waiting to be read. Press Retry on them.'); REC.filter(r => r.state === 'queued').forEach(r => { r.state = 'error'; r.error = 'Not read yet. Press Retry.'; }); draw(); }
+}
+(function boot(){ let saved = ''; try { saved = localStorage.getItem('trialCode') || ''; } catch (e) {} if (saved) tryCode(saved); })();
+
+/* ---------- manual (must be read once before using the app) ---------- */
+const GUIDE_KEY = 'guideOk1';
+const GUIDE = [
+  { t: 'What this tool does', b: `<p>It reads photos of receipts and Z-Reading tapes and puts the details into Excel, in your office's own layout, filed under the right client.</p><ul><li>Purchase receipts go to the monthly VAT and NON-VAT sheets.</li><li>Z-Reading tapes go to the sales sheet.</li><li>Every record keeps its scan, so you can always look back at the original.</li></ul><p class="tip">To read a receipt, its photo is sent to an outside reading service. Nothing is saved on our server.</p>` },
+  { t: '1. Add your clients', b: `<p>On the <b>Dashboard</b>, press <b>Add client</b>.</p><ul><li>Enter the business name and the TIN (9 or 12 digits).</li><li>Choose VAT or NON-VAT.</li><li>Choose whether the client has a cash register. Only clients with a register get Z-Readings.</li></ul><p>The TIN is used to check that a receipt really belongs to this client, so enter it carefully.</p>` },
+  { t: '2. Add receipts', b: `<ol><li>Open <b>Add receipts</b> and choose the client first.</li><li>Choose <b>Purchases</b> or <b>Z-Readings</b>.</li><li>Press <b>Add photos or PDF</b> (or <b>Take a photo</b> on a phone).</li></ol><p>One receipt per photo, or per PDF page. For a good result, lay the receipt flat, use good light, and keep the whole receipt in the picture.</p><p class="tip">Everything you add is filed under the client you chose, so pick the client before you add.</p>` },
+  { t: '3. Check every record', b: `<p>Open <b>Review</b>. For each receipt, compare the fields with the photo next to them.</p><ul><li><b>Yellow fields</b> are the ones the reader was unsure about. Check those first.</li><li>The system warns you if the buyer on the receipt is not the client, or if the same OR number and seller TIN were already saved.</li><li>Fix anything wrong, then press <b>Approve and save</b>.</li></ul><p class="stop">The reader can make mistakes, especially with faded or handwritten receipts. Nothing should go into Excel until a person has checked it.</p>` },
+  { t: '4. Sign off the month and export', b: `<ul><li>On the client's Dashboard, press <b>Mark as reviewed</b>, then <b>Lock month</b>. A locked month cannot be changed by accident.</li><li>Open <b>Export</b> and press <b>Download Excel file</b>. You get one workbook per client.</li><li>Only approved records are included. Records still waiting for a check are left out.</li></ul><p>The <b>Activity</b> tab shows who added, approved and signed off each record.</p>` },
+  { t: '5. Keep your records safe', b: `<ul><li>Your clients, records and scans are stored <b>only in this browser, on this computer</b>. They are not on a server and do not show on other computers.</li><li>Clearing the browser's site data deletes everything.</li><li>Open <b>Backup</b> and press <b>Download backup</b> often, and before the trial ends. <b>Restore</b> puts a backup back.</li></ul><p class="stop">This is a trial. It has a limit on how many receipts it can read and an end date, shown at the top of the screen. When either is reached, the app locks, so download a backup first.</p>` }
+];
+const guideDone = () => { try { return localStorage.getItem(GUIDE_KEY) === '1'; } catch (e) { return false; } };
+let gI = 0;
+function showGuide(){
+  $('#gate').hidden = true; $('#locked').hidden = true; $('#app').hidden = true; $('#topctl').hidden = true; $('#navWrap').hidden = true; $('#guide').hidden = false;
+  gI = 0; drawGuide();
+}
+function drawGuide(){
+  const g = GUIDE[gI], last = gI === GUIDE.length - 1;
+  $('#gStep').textContent = 'Manual · ' + (gI + 1) + ' of ' + GUIDE.length;
+  $('#gDots').innerHTML = GUIDE.map((_, i) => `<i class="${i <= gI ? 'on' : ''}"></i>`).join('');
+  $('#gTitle').textContent = g.t; $('#gBody').innerHTML = g.b;
+  $('#gBack').style.visibility = gI ? 'visible' : 'hidden';
+  $('#gAckRow').hidden = !last; $('#gNext').textContent = last ? 'Start using the app' : 'Next';
+  $('#gNext').disabled = last && !$('#gAck').checked;
+  window.scrollTo(0, 0);
+}
+$('#gBack').onclick = () => { if (gI > 0) { gI--; drawGuide(); } };
+$('#gAck').onchange = () => { $('#gNext').disabled = !$('#gAck').checked; };
+$('#gNext').onclick = () => {
+  if (gI < GUIDE.length - 1) { gI++; drawGuide(); return; }
+  if (!$('#gAck').checked) return;
+  try { localStorage.setItem(GUIDE_KEY, '1'); } catch (e) {}
+  $('#guide').hidden = true; enterApp();
+};
+function vHelp(){
+  return `<div class="manual">${GUIDE.map(g => `<div class="card"><h2>${esc(g.t)}</h2><div class="gbody" style="margin:0">${g.b}</div></div>`).join('')}</div>`;
+}
+
+/* ---------- sample data (so the tool can be explored without using up trial receipts) ---------- */
+function drawSampleScan(r, c){
+  return new Promise(res => {
+    const W = 520, lines = [], sale = r.kind === 'sale';
+    const L = (t, o) => lines.push(Object.assign({ t: String(t) }, o || {}));
+    const m = v => Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (sale) {
+      L(r.name, { b: 1, c: 1 }); L('Z-READING', { b: 1, c: 1, big: 1 }); L('TIN: ' + r.tin + '-' + r.branch, { c: 1 }); L('MIN: ' + r.min, { c: 1 }); L('');
+      L('Report date: ' + r.date); L('Last OR no.: ' + r.last_or); L('');
+      L('VATABLE SALES   ' + m(r.vatable_sales), { r: 1 }); L('VAT AMOUNT      ' + m(r.vat_amount), { r: 1 }); L('ZERO RATED      ' + m(r.zero_rated), { r: 1 }); L('VAT EXEMPT      ' + m(r.vat_exempt), { r: 1 });
+      L('NET SALES       ' + m(r.net_sales), { r: 1, b: 1 });
+    } else {
+      L(r.seller, { b: 1, c: 1, big: 1 }); L(r.address, { c: 1 }); L((r.vat_type === 'VAT' ? 'VAT Reg TIN: ' : 'NON-VAT Reg TIN: ') + r.tin, { c: 1 }); L('');
+      L((r.doc_type || 'Sales Invoice').toUpperCase(), { b: 1, c: 1 }); L('No. ' + r.doc_no + '     Date: ' + r.date); L('');
+      L('Sold to: ' + (r.buyer_name || '')); L('TIN: ' + (r.buyer_tin || '')); L('');
+      L('Assorted goods              ' + m(r.gross), { r: 1 }); L('');
+      if (r.vat_type === 'VAT') { const v = r.gross * 100 / 112; L('VATable sales   ' + m(v), { r: 1 }); L('VAT 12%         ' + m(r.gross - v), { r: 1 }); }
+      L('TOTAL AMOUNT DUE  ' + m(r.gross), { r: 1, b: 1 });
+    }
+    L(''); L('SAMPLE ONLY, NOT A REAL RECEIPT', { b: 1, c: 1 });
+    const H = 60 + lines.length * 30 + 40, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const x = cv.getContext('2d'); x.fillStyle = '#fbfaf5'; x.fillRect(0, 0, W, H); x.fillStyle = '#222'; x.textBaseline = 'top';
+    lines.forEach((l, i) => { x.font = (l.b ? 'bold ' : '') + (l.big ? 22 : 17) + 'px "Courier New",monospace'; x.textAlign = l.c ? 'center' : l.r ? 'right' : 'left'; x.fillText(l.t, l.c ? W / 2 : l.r ? W - 30 : 30, 30 + i * 30); });
+    x.save(); x.translate(W / 2, H / 2); x.rotate(-0.5); x.font = 'bold 54px sans-serif'; x.textAlign = 'center'; x.fillStyle = 'rgba(180,0,0,.12)'; x.fillText('SAMPLE', 0, -27); x.restore();
+    cv.toBlob(b => res(b), 'image/jpeg', 0.8);
+  });
+}
+function sampleData(){
+  const ts = Date.now(), A = 'sample-a', B = 'sample-b';
+  const clients = [
+    { id: A, name: 'Sample Sari-Sari Mart (SAMPLE)', tin: '123-456-789-000', vat: 'VAT', who: 'Mara', sales: true, due: '5', sample: true },
+    { id: B, name: 'Sample Bakery (SAMPLE)', tin: '987-654-321-000', vat: 'NON-VAT', who: 'John', sales: false, due: '10', sample: true }
+  ];
+  const recs = []; let n = 0;
+  const P = (cl, date, seller, tin, doc_no, gross, vat, dt, extra) => {
+    const c = clients.find(x => x.id === cl);
+    recs.push(Object.assign({ id: 'sr' + (++n) + '-' + ts, kind: 'purchase', client: cl, name: 'sample-receipt-' + n + '.jpg', state: 'approved', error: '', created: ts + n, by: 'Sample', approvedBy: 'Sample', approvedAt: ts, flags: [], ack: false, sample: true,
+      date, doc_no, tin, seller, address: 'Sample Street, La Trinidad, Benguet', buyer_name: c.name.replace(' (SAMPLE)', ''), buyer_tin: c.tin, gross, vat_type: vat, doc_type: dt || 'Sales Invoice', notValid: false }, extra || {}));
+  };
+  const W = ['Sample Wholesale Grocers', '000-100-200-000'], D = ['Sample Beverage Distributor', '000-100-300-000'], H = ['Sample Hardware Supply', '000-100-400-000'], K = ['Sample Packaging Trading', '000-100-500-000'], S = ['Sample Market Stall', '000-100-600-000'];
+  P(A, '2026-09-02', W[0], W[1], '10231', 18450.5, 'VAT'); P(A, '2026-09-05', D[0], D[1], '4410', 9320, 'VAT'); P(A, '2026-09-09', H[0], H[1], '88120', 2150, 'VAT');
+  P(A, '2026-09-12', W[0], W[1], '10288', 21780.25, 'VAT'); P(A, '2026-09-16', K[0], K[1], '3302', 1560, 'VAT'); P(A, '2026-09-19', S[0], S[1], '0071', 840, 'NON-VAT', 'Official Receipt');
+  P(A, '2026-09-23', D[0], D[1], '4477', 11200, 'VAT'); P(A, '2026-09-27', W[0], W[1], '10340', 16990, 'VAT');
+  P(A, '2026-10-01', W[0], W[1], '10402', 19875.75, 'VAT'); P(A, '2026-10-03', D[0], D[1], '4520', 8750, 'VAT'); P(A, '2026-10-06', K[0], K[1], '3391', 2240, 'VAT');
+  const BB = [['Sample Flour Mill', '000-200-100-000'], ['Sample Egg Supplier', '000-200-200-000'], ['Sample Sugar Trading', '000-200-300-000']];
+  [['2026-09-03', 0, '5501', 6400], ['2026-09-10', 1, '1204', 2850], ['2026-09-17', 2, '7710', 3900], ['2026-09-24', 0, '5538', 6400], ['2026-10-02', 1, '1251', 3100], ['2026-10-05', 2, '7766', 4200]].forEach(x => P(B, x[0], BB[x[1]][0], BB[x[1]][1], x[2], x[3], 'NON-VAT', 'Official Receipt'));
+  const Z = (date, last, v) => {
+    const vat = Math.round(v * 12) / 100;
+    recs.push({ id: 'sr' + (++n) + '-' + ts, kind: 'sale', client: A, name: 'Sample Sari-Sari Mart', state: 'approved', error: '', created: ts + n, by: 'Sample', approvedBy: 'Sample', approvedAt: ts, flags: [], ack: false, sample: true,
+      date, tin: '123-456-789', branch: '000', min: '21090112345', last_or: last, vatable_sales: v, vat_amount: vat, zero_rated: 0, vat_exempt: 0, net_sales: Math.round((v + vat) * 100) / 100, report_type: 'Z-Reading', remarks: '' });
+  };
+  Z('2026-09-28', '000611', 12480.5); Z('2026-09-29', '000648', 15320); Z('2026-09-30', '000690', 14110.75); Z('2026-10-01', '000731', 13950); Z('2026-10-02', '000772', 16240.25); Z('2026-10-03', '000815', 17005);
+  P(A, '2026-10-07', 'Sample Cold Chain Foods', '000-100-700-000', '9120', 7400, 'VAT', 'Sales Invoice', { state: 'pending', approvedBy: undefined, approvedAt: undefined, buyer_name: 'Another Business Corp', buyer_tin: '555-444-333-000' });
+  P(A, '2026-10-08', 'Sample Snack Wholesaler', '000-100-800-000', '2290', 5320, 'VAT', 'Sales Invoice', { state: 'pending', approvedBy: undefined, approvedAt: undefined, buyer_name: '', buyer_tin: '', flags: ['date'] });
+  return { clients, recs };
+}
+async function loadSamples(){
+  if (CL.some(c => c.sample)) { toast('Sample data is already loaded.'); return; }
+  toast('Loading sample data...');
+  const { clients, recs } = sampleData();
+  for (const c of clients) { CL.push(c); await dbPut('clients', c); }
+  for (const r of recs) {
+    const blob = await drawSampleScan(r, clientOf(r.client));
+    await putScan(r.id, blob); REC.push(r); await saveRec(r);
+  }
+  await log('Loaded sample data', clients[0].id);
+  st.client = ''; st.tab = 'dashboard'; toast('Sample data loaded. Clients named (SAMPLE) can be removed from the Backup tab.'); draw();
+}
+async function removeSamples(){
+  const ids = new Set(CL.filter(c => c.sample).map(c => c.id));
+  if (!ids.size) { toast('There is no sample data to remove.'); return; }
+  for (const r of REC.filter(r => ids.has(r.client))) { await dbDel('records', r.id); await dbDel('scans', r.id); URLS.delete(r.id); MEMSCANS.delete(r.id); PARTS.delete(r.id); }
+  REC = REC.filter(r => !ids.has(r.client));
+  for (const id of ids) { await dbDel('clients', id); Object.keys(SIGN).filter(k => k.startsWith(id + '|')).forEach(k => delete SIGN[k]); }
+  CL = CL.filter(c => !ids.has(c.id)); LOG = LOG.filter(l => !ids.has(l.client));
+  await dbClear('log'); for (const l of [...LOG].reverse()) await dbAdd('log', l);
+  await saveSign(); if (ids.has(st.client)) st.client = ''; st.confirm = ''; st.sel = null; st.review = null;
+  toast('Sample data removed.'); draw();
+}
+
+/* ---------- image preparation ---------- */
+function loadImg(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not open this image. Try JPG or PNG.')); };
+    img.src = url;
+  });
+}
+function cut(img, sx, sy, sw, sh, scale, q){
+  return new Promise((res, rej) => {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(sw * scale)); c.height = Math.max(1, Math.round(sh * scale));
+    c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    c.toBlob(b => b ? res(b) : rej(new Error('Could not prepare this image.')), 'image/jpeg', q);
+  });
+}
+const toB64 = blob => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1]); fr.onerror = () => rej(new Error('Could not prepare this image.')); fr.readAsDataURL(blob); });
+/* Tall receipts are cut into overlapping slices so small print stays sharp. A smaller copy is kept as the scan. */
+async function prepare(img){
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const view = await cut(img, 0, 0, w, h, Math.min(1, 1600 / Math.max(w, h)), 0.75);
+  if (h / w <= 1.6) {
+    const whole = await cut(img, 0, 0, w, h, Math.min(1, 1500 / Math.max(w, h)), 0.85);
+    return { view, parts: [await toB64(whole)] };
+  }
+  const needed = Math.ceil((h / (1.2 * w) - 0.1) / 0.9), n = Math.max(2, Math.min(IMG_MAX, needed));
+  const sliceH = h / (0.9 * n + 0.1), step = 0.9 * sliceH, sc = Math.min(1, 1300 / Math.max(w, sliceH)), parts = [];
+  for (let i = 0; i < n; i++) { const y = Math.max(0, Math.min(h - sliceH, Math.round(i * step))); parts.push(await toB64(await cut(img, 0, y, w, sliceH, sc, 0.85))); }
+  return { view, parts };
+}
+function rotateSrc(src){
+  const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+  const c = document.createElement('canvas'); c.width = h; c.height = w;
+  const x = c.getContext('2d'); x.translate(h, 0); x.rotate(Math.PI / 2); x.drawImage(src, 0, 0);
+  return c;
+}
+function uprightIfSideways(src, kind){ const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height; return (kind === 'sale' && w > h * 1.15) ? rotateSrc(src) : src; }
+async function pdfPages(file){
+  if (!window.pdfjsLib) throw new Error('The PDF reader did not load. Add photos instead, or reload the page.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise, out = [], n = Math.min(pdf.numPages, MAX_PDF_PAGES);
+  for (let p = 1; p <= n; p++) {
+    const page = await pdf.getPage(p), base = page.getViewport({ scale: 1 }), scale = Math.min(3, 2200 / Math.max(base.width, base.height)), vp = page.getViewport({ scale });
+    const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    out.push({ canvas: c, label: `${file.name} page ${p}` });
+  }
+  return { pages: out, skipped: pdf.numPages - n };
+}
+
+/* ---------- records ---------- */
+function newRec(name, kind, client){ return { id: uid(), kind, client, name, state: 'queued', error: '', created: Date.now(), by: USER, flags: [], ack: false, date: '', tin: '' }; }
+function fillFromRead(r, d){
+  r.flags = Array.isArray(d.uncertain) ? d.uncertain.map(String) : [];
+  r.date = d.date ?? '';
+  if (r.kind === 'sale') {
+    const dg = digits(d.tin);
+    r.tin = dg.length >= 9 ? `${dg.slice(0,3)}-${dg.slice(3,6)}-${dg.slice(6,9)}` + (dg.length >= 12 ? '-' + dg.slice(9, 12) : '') : (d.tin ?? '');
+    r.branch = dg.length >= 12 ? dg.slice(9, 12) : (dg.length > 9 ? dg.slice(9) : '000');
+    r.min = String(d.min ?? '').replace(/\s/g, ''); r.last_or = d.last_or ?? '';
+    ['vatable_sales','vat_amount','zero_rated','vat_exempt','net_sales'].forEach(k => { r[k] = d[k] ?? ''; });
+    r.name = d.name || r.name; r.report_type = String(d.report_type ?? ''); r.remarks = '';
+  } else {
+    r.doc_no = d.doc_no ?? ''; r.tin = d.tin ?? ''; r.seller = d.name ?? ''; r.address = d.address ?? '';
+    r.buyer_name = d.buyer_name ?? ''; r.buyer_tin = d.buyer_tin ?? ''; r.gross = d.total ?? '';
+    const v = String(d.vat_type ?? '').toUpperCase().replace(/[\s_]/g, '');
+    r.vat_type = v === 'VAT' ? 'VAT' : (v === 'NONVAT' || v === 'NON-VAT') ? 'NON-VAT' : '';
+    r.doc_type = d.doc_type ?? ''; r.notValid = d.not_valid_for_input_tax === true;
+  }
+}
+async function extract(r){
+  r.state = 'reading'; r.error = ''; draw();
+  const ctl = (extract.ctl = new AbortController());
+  try {
+    let parts = PARTS.get(r.id);
+    if (!parts) { const b = await getScan(r.id); const p = await prepare(await loadImg(b)); parts = p.parts; PARTS.set(r.id, parts); }
+    let out;
+    for (let attempt = 0; ; attempt++) {
+      try { out = await callApi({ code, images: parts, kind: r.kind }, ctl.signal); break; }
+      catch (e) {
+        if ((e.code !== 'busy' && e.code !== 'upstream') || attempt >= 2 || st.stopped) throw e;
+        r.error = 'Reading service is busy. Trying again...'; draw();
+        await new Promise(res => setTimeout(res, 3000 * (attempt + 1)));
+      }
+    }
+    if (!out.data || typeof out.data !== 'object') throw { code: 'invalid_json' };
+    fillFromRead(r, out.data); r.state = 'pending'; PARTS.delete(r.id);
+    trial.remaining = out.remaining; paintTrial();
+  } catch (e) {
+    if (e.code === 'expired' || e.code === 'limit') { r.state = 'error'; r.error = 'Trial limit reached.'; await saveRec(r); st.stopped = true; showLocked(e.code); return; }
+    r.state = 'error';
+    r.error = e.code === 'cancelled' ? 'Stopped. Press Retry to read it.' : (ERR[e.code] || 'Something went wrong. Press Retry.') + (e.info && e.info.detail ? ' [' + e.info.detail + ']' : '') + (e.message ? ' ' + e.message : '');
+  }
+  await saveRec(r); draw();
+}
+async function pump(){
+  if (st.running) return;
+  st.running = true; st.stopped = false;
+  try { while (!st.stopped) { const r = REC.find(x => x.state === 'queued'); if (!r) break; await extract(r); } }
+  finally {
+    st.running = false;
+    if (st.stopped) { REC.forEach(r => { if (r.state === 'queued') { r.state = 'error'; r.error = 'Stopped. Press Retry to read it.'; saveRec(r); } }); }
+    draw();
+    if (!st.stopped && REC.some(r => r.state === 'pending')) toast('Read. Open Review to check the details.');
+  }
+}
+async function addOne(file, label, source, kind, client){
+  const r = newRec(label, kind, client);
+  try {
+    const src = uprightIfSideways(source, kind), p = await prepare(src);
+    PARTS.set(r.id, p.parts); await putScan(r.id, p.view);
+  } catch (e) { r.state = 'error'; r.error = e.message || 'Could not open this file.'; }
+  REC.push(r); await saveRec(r);
+}
+async function addFiles(files){
+  const client = st.client || st.uclient, kind = st.kind, c = clientOf(client);
+  if (!c) { toast('Choose the client first.'); return; }
+  if (kind === 'sale' && !c.sales) { toast('This client has no register, so there are no Z-Readings to add.'); return; }
+  let n = 0;
+  for (const f of files) {
+    const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    if (isPdf) {
+      st.msg = 'Opening ' + f.name + '...'; draw();
+      try {
+        const { pages, skipped } = await pdfPages(f);
+        for (const pg of pages) { await addOne(f, pg.label, pg.canvas, kind, client); n++; }
+        st.msg = skipped > 0 ? `Only the first ${MAX_PDF_PAGES} pages of ${f.name} were added.` : '';
+      } catch (e) { const r = newRec(f.name, kind, client); r.state = 'error'; r.error = e.message || 'Could not open this PDF.'; REC.push(r); await saveRec(r); st.msg = ''; }
+    } else if (f.type.startsWith('image/')) {
+      try { await addOne(f, f.name || 'photo', await loadImg(f), kind, client); n++; }
+      catch (e) { const r = newRec(f.name, kind, client); r.state = 'error'; r.error = e.message; REC.push(r); await saveRec(r); }
+    }
+    draw();
+  }
+  if (n) await log('Added ' + n + (kind === 'sale' ? ' Z-Reading file' : ' receipt file') + (n > 1 ? 's' : ''), client);
+  draw(); pump();
+}
+async function rotateAndRetry(r){
+  try { const b = await getScan(r.id), img = await loadImg(b), rot = rotateSrc(img), p = await prepare(rot); PARTS.set(r.id, p.parts); await putScan(r.id, p.view); URLS.delete(r.id); r.state = 'queued'; r.error = ''; await saveRec(r); draw(); pump(); }
+  catch (e) { r.state = 'error'; r.error = e.message || 'Could not turn this photo.'; draw(); }
+}
+
+/* ---------- checks ---------- */
+function buyerState(r){
+  const c = clientOf(r.client); if (!c) return 'none';
+  if (!String(r.buyer_name || '').trim() && !String(r.buyer_tin || '').trim()) return 'none';
+  const bt = digits(r.buyer_tin), ct = digits(c.tin);
+  if (bt.length >= 9 && ct.length >= 9) return bt.slice(0, 9) === ct.slice(0, 9) ? 'ok' : 'other';
+  const a = String(r.buyer_name || '').toLowerCase().replace(/[^a-z0-9]/g, ''), b = c.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return a && (a.includes(b) || b.includes(a)) ? 'ok' : 'other';
+}
+function saleIssue(r){
+  const out = [];
+  if (r.report_type && !/^z/i.test(r.report_type.trim())) out.push('This looks like a ' + r.report_type + ' report, not a Z-Reading.');
+  const vs = num(r.vatable_sales), va = num(r.vat_amount), net = num(r.net_sales);
+  if (vs != null && va != null && net != null) { const parts = saleTotal(r); if (Math.abs(parts - net) > 0.06) out.push('The amounts add up to ' + parts.toFixed(2) + ' but net sales says ' + net.toFixed(2) + '. Check the figures against the photo.'); }
+  if (vs != null && va != null && Math.abs(va - vs * 0.12) > 1 + vs * 0.0003) out.push('VAT amount is not about 12 percent of vatable sales.');
+  return out.join(' ');
+}
+const KEYP = ['date','doc_no','tin','seller','gross','vat_type'], KEYS = ['date','tin','branch','min','last_or','vatable_sales','vat_amount'];
+const LABEL = { date:'date', doc_no:'OR / SI / DR no.', tin:'TIN', seller:'registered name', gross:'gross amount', vat_type:'VAT or NON-VAT', branch:'branch code', min:'MIN', last_or:'last OR', vatable_sales:'vatable sales', vat_amount:'VAT amount', buyer_name:'buyer name', buyer_tin:'buyer TIN', multiple_receipts:'more than one receipt in the photo', name:'registered name', total:'gross amount', address:'address' };
+const friendly = k => LABEL[k] || String(k).replace('_', ' ');
+const blank = (r, k) => !String(r[k] ?? '').trim();
+function checks(r){
+  const c = clientOf(r.client), out = [];
+  if (!c) return [['bad', 'This client no longer exists.']];
+  if (r.kind === 'sale') {
+    const a = digits(r.tin), b = digits(c.tin);
+    if (a.length >= 9 && b.length >= 9) { if (a.slice(0, 9) === b.slice(0, 9)) out.push(['ok', 'The TIN on the tape matches ' + c.name + '.']); else out.push(['bad', 'This is being filed under ' + c.name + ', but the TIN on the tape is different. Check you picked the right client.']); }
+    else out.push(['warn', 'The TIN could not be compared with ' + c.name + '. Check it by eye.']);
+    const si = saleIssue(r); if (si) out.push(['warn', si]);
+  } else {
+    const b = buyerState(r);
+    if (b === 'none') out.push(['warn', 'No buyer name or TIN on this receipt, so the system can\'t tell whose it is. Confirm it belongs to ' + c.name + '.']);
+    else if (b === 'ok') out.push(['ok', 'Buyer matches ' + c.name + '.']);
+    else out.push(['bad', 'This is being filed under ' + c.name + ', but the buyer on the receipt is ' + (r.buyer_name || 'another business') + ' (' + (r.buyer_tin || 'no TIN') + '). Check you picked the right client.']);
+    const d = REC.find(x => x.id !== r.id && x.kind === 'purchase' && x.state === 'approved' && x.doc_no && x.doc_no === r.doc_no && digits(x.tin) === digits(r.tin));
+    if (d) out.push(['bad', 'Possible duplicate: the same OR no. and seller TIN are already saved (' + dl(d.date) + ', ' + cname(d.client) + ').']);
+    if (r.notValid) out.push(['warn', 'This document says it is not valid for claiming input tax.']);
+  }
+  const m = (r.kind === 'sale' ? KEYS : KEYP).filter(k => blank(r, k));
+  if (r.flags.length) out.push(['warn', 'Unsure about: ' + r.flags.map(friendly).join(', ') + '. Compare with the photo.']);
+  if (m.length) out.push(['warn', 'Still empty: ' + m.map(friendly).join(', ') + '. Fill them in if they are on the document.']);
+  if (!validDate(r.date)) out.push(['bad', 'Enter the date as YYYY-MM-DD, for example 2026-10-27.']);
+  return out;
+}
+const needsAck = r => checks(r).some(x => x[0] === 'bad' || /^No buyer|^The TIN could not/.test(x[1]));
+const attention = r => r.state === 'pending' && checks(r).some(x => x[0] !== 'ok');
+
+/* ---------- navigation ---------- */
+const TABS = [['dashboard','Dashboard'],['upload','Add receipts'],['review','Review'],['purchases','Purchases'],['sales','Sales (Z-Readings)'],['export','Export'],['activity','Activity'],['backup','Backup'],['help','How to use']];
+function drawNav(){
+  const pend = REC.filter(r => r.state === 'pending' && (!st.client || r.client === st.client)).length;
+  const cur = TABS.find(t => t[0] === st.tab) || TABS[0], nb = $('#navBtn');
+  nb.innerHTML = `<span class="ic" aria-hidden="true"></span><span class="tx">${cur[1]}</span>${pend && st.tab !== 'review' ? `<span class="n" style="display:inline-block;min-width:18px;text-align:center;font-size:11px;border-radius:99px;padding:0 6px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line)">${pend} to check</span>` : ''}`;
+  nb.setAttribute('aria-expanded', !!st.menu); $('#nav').classList.toggle('open', !!st.menu);
+  $('#nav').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-t="${k}" aria-selected="${st.tab === k}">${k === 'upload' ? '<span class="lf">Add receipts</span><span class="ls">Add</span>' : k === 'sales' ? '<span class="lf">Sales (Z-Readings)</span><span class="ls">Sales</span>' : l}${k === 'review' && pend ? `<span class="n">${pend}</span>` : ''}</button>`).join('') + `<button data-name class="onlym">Signed in: ${esc(USER)} (change)</button>`;
+}
+$('#navBtn').addEventListener('click', e => { e.stopPropagation(); st.menu = !st.menu; drawNav(); });
+document.addEventListener('click', e => { if (st.menu && !e.target.closest('#nav')) { st.menu = false; drawNav(); } });
+$('#nav').addEventListener('click', e => { if (e.target.closest('[data-name]')) { st.menu = false; st.nameEdit = true; draw(); const n = $('#nm'); if (n) { n.focus(); n.scrollIntoView({ block: 'center' }); } return; } const b = e.target.closest('button[data-t]'); if (b) { st.menu = false; st.tab = b.dataset.t; st.sel = null; st.f = {}; st.confirm = ''; draw(); } });
+function drawTop(){
+  const t = $('#topctl'); if (t.contains(document.activeElement) && st.nameEdit === false && document.activeElement.tagName === 'SELECT') return;
+  t.innerHTML = `<label for="cli">Client</label><select id="cli"><option value="">All clients</option>${CL.map(c => `<option value="${c.id}" ${st.client === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+    <label for="mon">Month</label><select id="mon"><option value="">All months</option>${months().map(m => `<option value="${m}" ${st.month === m ? 'selected' : ''}>${ml(m)}</option>`).join('')}</select>
+    ${st.nameEdit ? `<input type="text" id="nm" value="${esc(USER)}" aria-label="Your name" style="width:9rem"><button class="btn small" id="nmSave">Save</button>` : `<button class="btn ghost" id="usr" title="Change the name shown in the activity log">Signed in: ${esc(USER)}</button>`}`;
+}
+$('#topctl').addEventListener('change', e => { if (e.target.id === 'cli') { st.client = e.target.value; st.sel = null; st.review = null; draw(); } if (e.target.id === 'mon') { st.month = e.target.value; draw(); } });
+$('#topctl').addEventListener('click', async e => {
+  if (e.target.id === 'usr') { st.nameEdit = true; draw(); const n = $('#nm'); if (n) n.focus(); }
+  if (e.target.id === 'nmSave') { const v = $('#nm').value.trim(); if (v) { USER = v.slice(0, 30); await dbPut('meta', USER, 'user'); } st.nameEdit = false; draw(); }
+});
+
+/* ---------- views ---------- */
+function status(c){
+  const m = curMonth(), sg = signOf(c.id, m);
+  const p = REC.filter(r => r.client === c.id && r.kind === 'purchase' && approved(r) && monthOf(r) === m).length;
+  const s = REC.filter(r => r.client === c.id && r.kind === 'sale' && approved(r) && monthOf(r) === m).length;
+  const waiting = REC.filter(r => r.client === c.id && r.state !== 'approved').length;
+  let label, cls;
+  if (sg === 'locked') { label = 'Locked'; cls = 'lock'; } else if (sg === 'reviewed') { label = 'Reviewed'; cls = 'go'; }
+  else if (!p && !s && !waiting) { label = 'Nothing received'; cls = 'none'; }
+  else if (waiting) { label = 'In progress'; cls = 'wip'; } else { label = 'Ready for review'; cls = 'go'; }
+  return { p, s, rev: waiting, label, cls };
+}
+function byMonth(cid){
+  const m = {}, row = k => m[k] = m[k] || { m: k, sales: 0, ov: 0, pur: 0, iv: 0 };
+  REC.filter(r => r.client === cid && approved(r)).forEach(r => {
+    const k = monthOf(r); if (k === 'UNDATED') return; const x = row(k);
+    if (r.kind === 'sale') { x.sales += saleTotal(r); x.ov += num(r.vat_amount) || 0; }
+    else { const g = num(r.gross) || 0; x.pur += g; if (r.vat_type === 'VAT') x.iv += g * 12 / 112; }
+  });
+  return Object.keys(m).sort().map(k => m[k]);
+}
+function chartSvg(rows, showSales){
+  const mob = window.innerWidth < 640, W = mob ? 340 : 520, H = mob ? 220 : 230, L = mob ? 58 : 52, B = 26, T = 10, R = 8, max = Math.max(1, ...rows.map(r => Math.max(r.sales, r.pur))) * 1.1;
+  const y = v => H - B - (H - B - T) * v / max, bw = (W - L - R) / rows.length; let s = '';
+  for (let i = 0; i <= 4; i++) { const v = max * i / 4; s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${compact(v)}</text>`; }
+  rows.forEach((r, i) => { const x = L + i * bw + bw * .14, w = bw * (showSales ? .34 : .6);
+    if (showSales) s += `<rect x="${x}" y="${y(r.sales)}" width="${w}" height="${H - B - y(r.sales)}" rx="4" fill="var(--accent)"/>`;
+    s += `<rect x="${x + (showSales ? w + 4 : 0)}" y="${y(r.pur)}" width="${w}" height="${H - B - y(r.pur)}" rx="4" fill="var(--amber)"/><text x="${L + i * bw + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${ml(r.m)}</text>`; });
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Purchases and sales by month">${s}</svg>`;
+}
+function clientForm(c){
+  const e = c || {};
+  return `<div class="card" style="margin-top:12px"><h2>${c ? 'Edit client' : 'Add a client'}</h2><p class="note">Once saved, the client shows in the list and in the client choice when adding receipts.</p>
+  <div class="fields one" style="margin-top:12px;max-width:44rem"><div class="w"><label for="nc-name">Business name</label><input type="text" id="nc-name" value="${esc(e.name || '')}" placeholder="Registered name as on the BIR certificate"></div>
+  <div><label for="nc-tin">TIN with branch code</label><input type="text" id="nc-tin" value="${esc(e.tin || '')}" placeholder="000-000-000-000"></div>
+  <div><label for="nc-vat">Registration</label><select id="nc-vat"><option ${e.vat === 'VAT' ? 'selected' : ''}>VAT</option><option ${e.vat === 'NON-VAT' ? 'selected' : ''}>NON-VAT</option></select></div>
+  <div><label for="nc-who">Assigned to</label><input type="text" id="nc-who" value="${esc(e.who || '')}" placeholder="Staff name"></div>
+  <div><label for="nc-reg">Cash register</label><select id="nc-reg"><option value="yes" ${e.sales !== false ? 'selected' : ''}>Has a register</option><option value="no" ${e.sales === false ? 'selected' : ''}>No register</option></select></div>
+  <div><label for="nc-due">Internal deadline (day of month)</label><input type="text" id="nc-due" value="${esc(e.due || '')}" placeholder="e.g. 5" inputmode="numeric"></div></div>
+  <div class="bar"><button class="btn" id="saveClient">Save client</button><button class="btn ghost" id="cancelClient">Cancel</button></div></div>`;
+}
+function vFirm(){
+  if (!CL.length) return `<div class="card empty"><h2>Add your first client</h2><p class="note" style="max-width:36rem;margin:6px auto 12px">Each client gets its own space. Receipts and Z-Readings are filed under the client you pick, so records never get mixed.</p><button class="btn" data-add>Add client</button> <button class="btn ghost" data-sample>Try with sample data</button></div>${st.editing === 'new' ? clientForm() : ''}`;
+  const rows = CL.map(c => ({ c, s: status(c) }));
+  const behind = rows.filter(x => x.s.label === 'Nothing received').length, rev = REC.filter(r => r.state === 'pending').length, ready = rows.filter(x => x.s.label === 'Ready for review').length, done = rows.filter(x => x.s.cls === 'lock' || x.s.label === 'Reviewed').length;
+  const approvedNow = REC.filter(r => approved(r) && monthOf(r) === curMonth()).length;
+  const m = num(st.tManual) || 0, k = num(st.tCheck) || 0, hand = approvedNow * m, tool = approvedNow * k;
+  const fmt = x => x >= 60 ? `${Math.floor(x / 60)} h ${Math.round(x % 60)} min` : `${Math.round(x * 10) / 10} min`;
+  return `<div class="tiles">
+   <div class="card tile"><span class="l">Clients</span><b>${CL.length}</b></div>
+   <div class="card tile"><span class="l">Nothing received for ${ml(curMonth())}</span><b>${behind}</b></div>
+   <div class="card tile"><span class="l">Records to check</span><b>${rev}</b></div>
+   <div class="card tile"><span class="l">Ready for review</span><b>${ready}</b></div>
+   <div class="card tile"><span class="l">Reviewed or locked</span><b>${done}</b></div></div>
+  ${st.editing === 'new' ? clientForm() : ''}
+  <div class="card" style="margin-top:12px"><div class="bar" style="margin:0;justify-content:space-between"><h2>Clients for ${ml(curMonth())}</h2><button class="btn" data-add>Add client</button></div><p class="note">Where each client stands this month. Click a client to open its records.</p>
+   <div class="tw" style="margin-top:10px"><table><thead><tr><th>Client</th><th>TIN</th><th class="n">Receipts</th><th class="n">Z-Readings</th><th class="n">To check</th><th>Assigned</th><th>Internal deadline</th><th>Status</th></tr></thead><tbody>
+   ${rows.map(({ c, s }) => `<tr data-client="${c.id}"><td class="ttl"><b>${esc(c.name)}</b></td><td class="mono hm" data-l="TIN">${esc(c.tin)}</td><td class="n" data-l="Receipts">${s.p}</td><td class="n" data-l="Z-Readings">${c.sales ? s.s : 'n/a'}</td><td class="n" data-l="To check">${s.rev}</td><td class="hm" data-l="Assigned">${esc(c.who || '')}</td><td class="hm" data-l="Internal deadline">${c.due ? 'by the ' + esc(c.due) + 'th' : ''}</td><td data-l="Status"><span class="stat ${s.cls}">${s.label}</span></td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card" style="margin-top:12px"><h2>Recent activity</h2><div class="log" style="margin-top:6px">${LOG.slice(0, 4).map(l => `<div><span class="t">${l.t}</span><span class="u">${esc(l.who)}</span><span>${esc(cname(l.client))}: ${esc(l.act)}</span></div>`).join('') || '<div class="empty">Nothing yet.</div>'}</div></div>
+  <div class="card" style="margin-top:12px"><h2>Time saved</h2><p class="note">Example timings for ${approvedNow} approved record${approvedNow === 1 ? '' : 's'} in ${ml(curMonth())}. Change them to match your office.</p>
+   <div class="tgrid"><div class="cell"><span>Typing one by hand (min)</span><input type="text" id="tManual" value="${esc(st.tManual)}" inputmode="decimal"></div><div class="cell"><span>Checking one here (min)</span><input type="text" id="tCheck" value="${esc(st.tCheck)}" inputmode="decimal"></div>
+   <div class="cell"><span>By hand</span><strong>${fmt(hand)}</strong></div><div class="cell"><span>With this tool</span><strong>${fmt(tool)}</strong></div><div class="cell"><span>Saved</span><strong>${fmt(Math.max(0, hand - tool))}</strong></div></div></div>`;
+}
+function vClient(){
+  const c = clientOf(st.client);
+  if (!c) { st.client = ''; return vFirm(); }
+  const mine = REC.filter(r => r.client === c.id && approved(r) && inMonth(r)), p = mine.filter(r => r.kind === 'purchase'), s = mine.filter(r => r.kind === 'sale');
+  const g = p.reduce((a, r) => a + (num(r.gross) || 0), 0), inTax = p.filter(r => r.vat_type === 'VAT').reduce((a, r) => a + (num(r.gross) || 0), 0) * 12 / 112;
+  const net = s.reduce((a, r) => a + saleTotal(r), 0), ov = s.reduce((a, r) => a + (num(r.vat_amount) || 0), 0), bm = byMonth(c.id);
+  const sg = signOf(c.id, curMonth()), stt = status(c);
+  const sign = `<div class="card" style="margin-top:12px"><h2>Month sign-off: ${ml(curMonth())}</h2><p class="note">Get the records ready, mark the month as reviewed, then lock it so figures can't change after filing. In the paid version only a reviewer login can sign off.</p>
+   <div class="bar"><span class="stat ${stt.cls}">${stt.label}</span><span class="count">${c.who ? 'Assigned to ' + esc(c.who) : ''}</span><span style="flex:1"></span>
+   ${sg === 'open' ? `<button class="btn" data-sign="reviewed" ${stt.rev ? 'disabled' : ''}>Mark as reviewed</button>` : sg === 'reviewed' ? `<button class="btn" data-sign="locked">Lock month</button><button class="btn ghost" data-sign="open">Reopen</button>` : `<button class="btn ghost" data-sign="reviewed">Unlock</button>`}</div>
+   ${stt.rev ? `<p class="note">${stt.rev} record(s) still need a check before this month can be reviewed.</p>` : ''}</div>`;
+  return `<div class="bar" style="margin-top:0"><button class="btn ghost" data-all>All clients</button><b style="font-size:16px">${esc(c.name)}</b><span class="count mono">${esc(c.tin)} · ${c.vat} registered</span><button class="btn ghost small" data-edit="${c.id}">Edit client</button></div>
+  ${st.editing === c.id ? clientForm(c) : ''}
+  <div class="tiles"><div class="card tile"><span class="l">Purchases, gross</span><b>${compact(g)}</b></div><div class="card tile"><span class="l">Input tax (VAT purchases)</span><b>${compact(inTax)}</b></div>
+  ${c.sales ? `<div class="card tile"><span class="l">Sales, total</span><b>${compact(net)}</b></div><div class="card tile"><span class="l">Output VAT</span><b>${compact(ov)}</b></div>` : ''}
+  <div class="card tile"><span class="l">To check</span><b>${stt.rev}</b></div></div>
+  ${sign}
+  <div class="grid2"><div class="card"><h2>${c.sales ? 'Sales and purchases by month' : 'Purchases by month'}</h2><p class="note">Gross amounts in pesos.</p><div class="legend">${c.sales ? '<span><i class="sw" style="background:var(--accent)"></i>Sales</span>' : ''}<span><i class="sw" style="background:var(--amber)"></i>Purchases</span></div>${bm.length ? chartSvg(bm, c.sales) : '<p class="note" style="padding:40px 0;text-align:center">Nothing approved yet.</p>'}</div>
+  <div class="card"><h2>VAT summary</h2><p class="note">${c.vat === 'VAT' ? 'Output VAT less input tax on VAT purchases. An estimate to help the return, not the return itself.' : 'This client is NON-VAT, so there is no VAT summary. Purchases go on the NON-VAT sheet.'}</p>
+  ${c.vat === 'VAT' && bm.length ? `<div class="tw" style="margin-top:10px"><table><thead><tr><th>Month</th><th class="n">Output VAT</th><th class="n">Input tax</th><th class="n">Net VAT</th></tr></thead><tbody>${bm.map(r => `<tr style="cursor:default"><td data-l="Month">${ml(r.m)}</td><td class="n" data-l="Output VAT">${peso(r.ov)}</td><td class="n" data-l="Input tax">${peso(r.iv)}</td><td class="n" data-l="Net VAT">${peso(r.ov - r.iv)}</td></tr>`).join('')}</tbody></table></div>` : ''}</div></div>`;
+}
+const vDash = () => st.client ? vClient() : vFirm();
+
+function vUpload(){
+  if (!CL.length) return `<div class="card empty">Add a client first, then come back to add receipts.<br><button class="btn" style="margin-top:12px" data-add>Add client</button></div>`;
+  const uc = st.client || st.uclient, cl = clientOf(uc);
+  const queue = REC.filter(r => r.state !== 'approved' && (!st.client || r.client === st.client)).sort((a, b) => b.created - a.created);
+  const q = queue.map(r => {
+    const stat = r.state === 'queued' ? 'Waiting' : r.state === 'reading' ? '<span class="dots"></span>Reading' : r.state === 'pending' ? 'Ready to check' : 'Problem';
+    return `<div class="qi"><div class="th"><img data-scan="${r.id}" alt=""></div><div class="t"><b>${esc(r.kind === 'sale' ? 'Z-Reading · ' + r.name : r.name)}</b><span>For ${esc(cname(r.client))} · ${stat}${r.state === 'error' ? ' · ' + esc(r.error) : ''}</span></div>
+      ${r.state === 'pending' ? `<button class="btn ghost small" data-rv="${r.id}">Check</button>` : ''}${r.state === 'error' ? `<button class="btn small" data-retry="${r.id}">Retry</button>` : ''}${r.kind === 'sale' && r.state !== 'reading' ? `<button class="btn ghost small" data-rotate="${r.id}">Rotate</button>` : ''}<button class="btn danger small" data-remove="${r.id}">Remove</button></div>`;
+  }).join('');
+  const sel = st.client ? `<b>${esc(cl.name)}</b>` : `<select id="ucl" aria-label="Client for these files"><option value="">Choose the client first</option>${CL.map(c => `<option value="${c.id}" ${uc === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>`;
+  const noSales = st.kind === 'sale' && cl && !cl.sales, can = cl && !noSales;
+  return `<div class="drop" id="drop"><div class="h"><b>Add receipts or Z-Readings</b><span class="note">Photos or PDF scans, one receipt per photo or per PDF page. Everything added is filed under the client chosen here, so records never get mixed.</span></div>
+   <div class="ctl"><label>Client</label>${sel}<button class="btn ghost small" data-add>New client</button></div>
+   <div class="seg" role="group" aria-label="What are you adding"><button data-k="purchase" aria-pressed="${st.kind === 'purchase'}">Purchases</button><button data-k="sale" aria-pressed="${st.kind === 'sale'}">Z-Readings</button></div>
+   <button class="btn" id="addBtn" ${can ? '' : 'disabled'}>Add photos or PDF</button><button class="btn ghost" id="camBtn" ${can ? '' : 'disabled'}>Take a photo</button>${st.running ? '<button class="btn ghost" id="stopBtn">Stop</button>' : ''}</div>
+   ${noSales ? '<p class="note" style="margin-top:8px">This client has no register, so there are no Z-Readings to add.</p>' : ''}
+   <p class="note" style="margin-top:8px">${st.kind === 'sale' ? 'Z-Reading tapes are often photographed sideways. They are turned upright automatically. Use Rotate if one is still wrong.' : 'Printed and handwritten receipts both work. Flat and well lit gives the best result.'} ${esc(st.msg || '')}</p>
+   <div class="q">${q || '<div class="empty card">Nothing waiting. Files you add show here until you approve them.</div>'}</div>`;
+}
+
+const HM = ['tin','vat_type','branch','min','zero_rated','vat_exempt'];
+const PF = [['date','Date',''],['doc_no','OR / SI / DR no.',''],['tin','Seller TIN',''],['gross','Gross amount','num'],['seller','Registered name (seller)','w'],['address','Address','w'],['buyer_name','Sold to (buyer name)','w'],['buyer_tin','Buyer TIN',''],['vat_type','VAT or NON-VAT','sel'],['doc_type','Document type','']];
+const SF = [['date','Report date',''],['tin','TIN',''],['branch','Branch code',''],['min','MIN',''],['last_or','Last OR / invoice no.',''],['vatable_sales','Vatable sales','num'],['vat_amount','VAT amount','num'],['zero_rated','Zero rated','num'],['vat_exempt','VAT exempt','num'],['net_sales','Net sales (for checking)','num'],['name','Business name','w'],['remarks','Remarks','w']];
+function fieldsHTML(r){
+  const F = r.kind === 'sale' ? SF : PF, key = r.kind === 'sale' ? KEYS : KEYP;
+  return F.map(([k, l, t]) => {
+    const w = r.flags.includes(k) || (key.includes(k) && blank(r, k)) || (r.kind === 'sale' && ['vatable_sales','vat_amount','zero_rated','vat_exempt','net_sales'].includes(k) && saleIssue(r)) ? 'warn' : '';
+    const inner = t === 'sel' ? `<select data-f="${k}" id="f-${k}" class="${w}">${['', 'VAT', 'NON-VAT'].map(o => `<option value="${o}" ${r[k] === o ? 'selected' : ''}>${o || 'Choose...'}</option>`).join('')}</select>` : `<input type="text" data-f="${k}" id="f-${k}" class="${(t === 'num' ? 'num ' : '') + w}" value="${esc(r[k] ?? '')}">`;
+    return `<div class="${t === 'w' ? 'w' : ''}"><label for="f-${k}">${l}</label>${inner}</div>`;
+  }).join('');
+}
+function boxesHTML(r){
+  const ch = checks(r);
+  const boxes = ch.map(([k, t]) => `<div class="msgbox ${k === 'ok' ? 'ok' : k === 'warn' ? 'warn' : 'bad'}">${esc(t)}</div>`).join('');
+  const need = needsAck(r);
+  return `<div id="chk">${boxes}${need ? `<label class="ack"><input type="checkbox" id="ack" ${r.ack ? 'checked' : ''}> I checked and this belongs to ${esc(cname(r.client))}</label>` : ''}</div>
+   <div class="bar" style="margin-top:14px"><button class="btn" id="approve" ${(need && !r.ack) || !validDate(r.date) ? 'disabled' : ''}>Approve and save</button><button class="btn ghost" id="skip">Skip for now</button></div>`;
+}
+function vReview(){
+  const ready = REC.filter(r => r.state === 'pending' && (!st.client || r.client === st.client)).sort((a, b) => a.created - b.created);
+  if (!ready.length) return `<div class="card empty">Nothing waiting for a check${st.client ? ' for this client' : ''}.<br><button class="btn" style="margin-top:12px" data-go="upload">Add receipts</button></div>`;
+  const cur = ready.find(i => i.id === st.review) || ready[0]; st.review = cur.id;
+  return `<div class="bar" style="margin-top:0"><span class="count">Filing under <b>${esc(cname(cur.client))}</b>, ${ready.length} waiting. Yellow fields are the ones to check first.</span></div>
+  <div class="split"><div class="photo"><img data-scan="${cur.id}" alt="Photo of ${esc(cur.name)}"></div>
+  <div class="card"><h2>${cur.kind === 'sale' ? 'Z-Reading' : 'Receipt'} details</h2><p class="note">${esc(cur.name)}. Edit anything that is wrong.</p><div class="fields" style="margin-top:12px">${fieldsHTML(cur)}</div><div id="rvbox">${boxesHTML(cur)}</div></div></div>`;
+}
+async function approve(){
+  const r = REC.find(x => x.id === st.review); if (!r) return;
+  const m = monthOf(r);
+  if (signOf(r.client, m) === 'locked') { toast(ml(m) + ' is locked for ' + cname(r.client) + '. Unlock it first.'); return; }
+  if (r.kind === 'sale') { ['vatable_sales','vat_amount','zero_rated','vat_exempt','net_sales'].forEach(k => { const n = num(r[k]); r[k] = n == null ? '' : n; }); r.branch = String(r.branch || '000').padStart(3, '0'); }
+  else { const n = num(r.gross); r.gross = n == null ? '' : n; }
+  r.state = 'approved'; r.approvedBy = USER; r.approvedAt = Date.now(); r.ack = false;
+  await saveRec(r);
+  await log('Approved ' + (r.kind === 'sale' ? 'Z-Reading ' + (r.last_or || '') + ' (' + dl(r.date) + ')' : 'receipt ' + (r.doc_no || '(no number)') + ' (' + (r.seller || 'unknown seller') + ')'), r.client);
+  toast('Saved to ' + cname(r.client) + '.'); st.review = null; draw();
+}
+
+const buyerPill = r => { const b = buyerState(r); return b === 'ok' ? '<span class="pill ok">Matches</span>' : b === 'none' ? '<span class="pill">No buyer shown</span>' : '<span class="pill bad">Other buyer</span>'; };
+const statePill = r => r.state === 'approved' ? '<span class="pill ok">Approved</span>' : '<span class="pill bad">Pending check</span>';
+function cols(isS){
+  const cl = st.client ? [] : [['client', 'Client']];
+  return isS ? [...cl, ['date','Date'], ['branch','Branch'], ['min','MIN'], ['last_or','Last OR'], ['vatable_sales','Vatable sales','n'], ['vat_amount','VAT amount','n'], ['zero_rated','Zero rated','n'], ['vat_exempt','VAT exempt','n'], ['total','Total','n'], ['state','Status']]
+    : [...cl, ['date','Date'], ['doc_no','OR / SI / DR no.'], ['seller','Registered name'], ['tin','TIN'], ['gross','Gross amount','n'], ['vat_type','VAT'], ['buyer','Buyer check'], ['state','Status']];
+}
+function cellVal(r, k){
+  if (k === 'client') return esc(cname(r.client)); if (k === 'date') return dl(r.date);
+  if (['gross','vatable_sales','vat_amount','zero_rated','vat_exempt'].includes(k)) return r[k] === '' || r[k] == null ? '' : peso(num(r[k]));
+  if (k === 'total') return peso(saleTotal(r)); if (k === 'state') return statePill(r); if (k === 'buyer') return buyerPill(r);
+  return esc(r[k]);
+}
+function detailHTML(r){
+  const rows = r.kind === 'sale'
+    ? [['Client', cname(r.client)], ['Report date', dl(r.date)], ['TIN', r.tin], ['Branch', r.branch], ['MIN', r.min], ['Last OR', r.last_or], ['Vatable sales', peso(num(r.vatable_sales))], ['VAT amount', peso(num(r.vat_amount))], ['Zero rated', peso(num(r.zero_rated))], ['VAT exempt', peso(num(r.vat_exempt))], ['Total', peso(saleTotal(r))], ['Remarks', r.remarks || '']]
+    : [['Client', cname(r.client)], ['Date', dl(r.date)], ['OR / SI / DR no.', r.doc_no], ['Seller', r.seller], ['Address', r.address], ['Seller TIN', r.tin], ['Buyer', (r.buyer_name || 'none shown') + (r.buyer_tin ? ' · ' + r.buyer_tin : '')], ['Gross amount', peso(num(r.gross))], ['VAT or NON-VAT', r.vat_type], ['Document type', r.doc_type]];
+  const locked = signOf(r.client, monthOf(r)) === 'locked';
+  return `<div class="card detail"><div class="bar" style="margin-top:0;justify-content:space-between"><h2>${r.kind === 'sale' ? 'Z-Reading' : 'Receipt'} scan</h2><button class="btn ghost small" data-close>Close</button></div>
+   <div class="photo"><img data-scan="${r.id}" alt="Scan of ${esc(r.name)}"></div>
+   <dl class="dl" style="margin-top:10px">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+   <p class="note" style="margin-top:8px">${r.approvedBy ? 'Approved by ' + esc(r.approvedBy) + '. ' : ''}File: ${esc(r.name)}</p>
+   <div class="bar">${locked ? '<span class="count">This month is locked.</span>' : `<button class="btn ghost small" data-reopen="${r.id}">Reopen for editing</button><button class="btn danger small" data-del="${r.id}">${st.confirm === r.id ? 'Press again to remove' : 'Remove record'}</button>`}</div></div>`;
+}
+function vRecords(kind){
+  const isS = kind === 'sale', all = recs(kind).filter(r => ['approved', 'pending'].includes(r.state) && inClient(r)), cs = cols(isS), f = st.f, q = (f.q || '').toLowerCase();
+  let rows = all.filter(inMonth).filter(r => (!f.vt || r.vat_type === f.vt) && (!f.br || r.branch === f.br) && (!f.s || r.state === f.s) && (!f.b || buyerState(r) === f.b) && (!q || (Object.values(r).filter(v => typeof v !== 'object').join(' ') + ' ' + cname(r.client) + ' ' + dl(r.date)).toLowerCase().includes(q)));
+  const s = isS ? st.ssort : st.psort, nums = ['gross','vatable_sales','vat_amount','zero_rated','vat_exempt','total'];
+  const val = (r, k) => k === 'total' ? saleTotal(r) : k === 'client' ? cname(r.client) : k === 'buyer' ? buyerState(r) : r[k];
+  rows = rows.slice().sort((a, b) => { const x = val(a, s[0]), y = val(b, s[0]); return (nums.includes(s[0]) ? (num(x) || 0) - (num(y) || 0) : String(x ?? '').localeCompare(String(y ?? ''))) * s[1]; });
+  const sel = all.find(r => r.id === st.sel), opt = (k, v, l) => `<option value="${v}" ${f[k] === v ? 'selected' : ''}>${l}</option>`;
+  const branches = [...new Set(all.map(r => r.branch).filter(Boolean))].sort();
+  const filt = isS ? `<select data-fl="br" aria-label="Branch"><option value="">All branches</option>${branches.map(b => opt('br', b, 'Branch ' + b)).join('')}</select>`
+    : `<select data-fl="vt" aria-label="VAT type"><option value="">VAT and NON-VAT</option>${opt('vt','VAT','VAT')}${opt('vt','NON-VAT','NON-VAT')}</select><select data-fl="b" aria-label="Buyer check"><option value="">Any buyer check</option>${opt('b','ok','Matches client')}${opt('b','none','No buyer shown')}${opt('b','other','Other buyer')}</select>`;
+  return `<div class="card"><h2>${isS ? 'Daily sales from Z-Readings' : 'Purchase receipts'}${st.client ? ' · ' + esc(cname(st.client)) : ' · all clients'}</h2><p class="note">Search, filter and sort. Click a row to see the scan.</p>
+   <div class="bar"><input type="search" data-fl="q" value="${esc(f.q || '')}" placeholder="${isS ? 'Search date, branch, MIN or last OR' : 'Search name, TIN, OR/SI no. or client'}" aria-label="Search"><select data-fl="s" aria-label="Status"><option value="">Approved and pending</option>${opt('s','approved','Approved')}${opt('s','pending','Pending check')}</select>${filt}<span class="count">${rows.length} of ${all.length}</span></div></div>
+   <div class="split" style="margin-top:12px"><div class="tw"><table><thead><tr>${cs.map(c => `<th class="${c[2] || ''}" data-sk="${c[0]}">${c[1]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr data-id="${r.id}" class="${st.sel === r.id ? 'sel' : ''}">${cs.map(c => `<td class="${(c[2] || '') + (HM.includes(c[0]) ? ' hm' : '') + (c[0] === 'seller' || c[0] === 'client' ? ' ttl' : '')}" data-l="${c[1]}">${cellVal(r, c[0])}</td>`).join('')}</tr>`).join('') || `<tr style="cursor:default"><td colspan="${cs.length}" class="empty">No records yet.</td></tr>`}</tbody></table></div>${sel ? detailHTML(sel) : '<div class="card empty nom">Pick a row to see its scan.</div>'}</div>`;
+}
+
+/* ---------- export in the office's own Excel format ---------- */
+const MONTHS_ = MONTHS;
+function parseDate(s){
+  const m = String(s || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!m) return null;
+  const y = +m[1], mo = +m[2], d = +m[3];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return { y, mo, d };
+}
+function exportSets(cid, month){
+  const mine = REC.filter(r => r.client === cid && approved(r) && (!month || monthOf(r) === month));
+  const rows = mine.filter(r => r.kind === 'purchase').map(r => ({
+    date: String(r.date || '').trim(), doc_no: String(r.doc_no || '').trim(), tin: String(r.tin || '').trim(), name: String(r.seller || '').trim(), address: String(r.address || '').trim(),
+    total: num(r.gross), vat_type: r.vat_type === 'NON-VAT' ? 'NON-VAT' : 'VAT', doc_type: String(r.doc_type || '').trim(), source: r.name, checked: 'Yes' }));
+  const sales = mine.filter(r => r.kind === 'sale').map(r => {
+    const t = k => String(r[k] ?? '').trim();
+    return { date: t('date'), tin: t('tin'), branch: t('branch') || '000', name: t('name'), min: t('min'), last_or: t('last_or'),
+      vatable_sales: num(r.vatable_sales), vat_amount: num(r.vat_amount), zero_rated: num(r.zero_rated), vat_exempt: num(r.vat_exempt), net_sales: num(r.net_sales), remarks: t('remarks'), source: r.name, checked: 'Yes' };
+  });
+  return { rows, sales };
+}
+/* One VAT sheet and one NON-VAT sheet for each month found, laid out like the office's sample file. */
+function buildWorkbook(ExcelJSLib, rows, contact, sales = []){
+  const wb = new ExcelJSLib.Workbook();
+  const groups = new Map();
+  for (const row of rows) {
+    const p = parseDate(row.date);
+    const key = p ? `${p.y}-${String(p.mo).padStart(2,'0')}` : 'UNDATED';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  const keys = [...groups.keys()].sort();
+  const names = new Set();
+  const money = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@';
+  const sheetName = (base) => { let n = base.slice(0, 31), i = 2; while (names.has(n)) n = base.slice(0, 27) + ' ' + i++; names.add(n); return n; };
+  if (rows.length) {
+    const all = wb.addWorksheet('ALL RECEIPTS');
+    names.add('ALL RECEIPTS');
+    const allHeads = ['DATE','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS AMOUNT','VAT / NON-VAT','DOCUMENT TYPE','SOURCE FILE','CHECKED'];
+    allHeads.forEach((h, i) => {
+      const c = all.getCell(1, i + 1);
+      c.value = h; c.font = { name: 'Calibri', size: 12, bold: true };
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7EFEA' } };
+    });
+    [12,16,17,41,36,16,14,18,30,10].forEach((w, i) => { all.getColumn(i + 1).width = w; });
+    const sorted = rows.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+    sorted.forEach((r, i) => {
+      const n = 2 + i, p = parseDate(r.date);
+      const dc = all.getCell(n, 1);
+      if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm/dd/yyyy'; } else dc.value = r.date;
+      all.getCell(n, 2).value = r.doc_no; all.getCell(n, 3).value = r.tin; all.getCell(n, 4).value = r.name; all.getCell(n, 5).value = r.address;
+      const g = all.getCell(n, 6); g.value = r.total; g.numFmt = '#,##0.00';
+      all.getCell(n, 7).value = r.vat_type; all.getCell(n, 8).value = r.doc_type; all.getCell(n, 9).value = r.source; all.getCell(n, 10).value = r.checked;
+    });
+    all.views = [{ state: 'frozen', ySplit: 1 }];
+    all.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(2, sorted.length + 1), column: allHeads.length } };
+    for (const key of keys) {
+      const rs = groups.get(key);
+      let label;
+      if (key === 'UNDATED') label = 'UNDATED';
+      else { const [y, mo] = key.split('-'); label = MONTHS_[+mo - 1] + (new Set(keys.filter(k => k !== 'UNDATED').map(k => k.slice(0,4))).size > 1 ? ' ' + y : ''); }
+      for (const kind of ['VAT', 'NON-VAT']) {
+        const ws = wb.addWorksheet(sheetName(label + (kind === 'VAT' ? ' PUR-VAT' : ' PUR-NONVAT')));
+        const heads = kind === 'VAT'
+          ? ['DATE ','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS TAXABLE ','INPUT TAX','VATABLE PURCHASES','TOTAL PURCHASES']
+          : ['DATE ','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS TAXABLE '];
+        heads.forEach((h, i) => {
+          const col = String.fromCharCode(65 + i);
+          ws.mergeCells(`${col}1:${col}2`);
+          const c = ws.getCell(`${col}1`);
+          c.value = h; c.font = { name: 'Calibri', size: 12, bold: true };
+          c.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+        [['A',12],['B',16],['C',17],['D',41],['E',36],['F',18],['G',14],['H',20],['I',18]].forEach(([c, w]) => { ws.getColumn(c).width = w; });
+        const mine = rs.filter(r => r.vat_type === kind).sort((a, b) => a.date.localeCompare(b.date));
+        mine.forEach((r, i) => {
+          const n = 3 + i, p = parseDate(r.date);
+          const dc = ws.getCell(`A${n}`);
+          if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm-dd-yy'; } else dc.value = r.date;
+          ws.getCell(`B${n}`).value = r.doc_no; ws.getCell(`C${n}`).value = r.tin; ws.getCell(`D${n}`).value = r.name; ws.getCell(`E${n}`).value = r.address;
+          const f = ws.getCell(`F${n}`); f.value = r.total; f.numFmt = money;
+          if (kind === 'VAT') {
+            const h = r.total == null ? 0 : r.total * 100 / 112, g = h * 0.12;
+            ws.getCell(`G${n}`).value = { formula: `H${n}*0.12`, result: g };
+            ws.getCell(`H${n}`).value = { formula: `F${n}*100/112`, result: h };
+            ws.getCell(`I${n}`).value = { formula: `G${n}+H${n}`, result: g + h };
+            ['G','H','I'].forEach(c => { ws.getCell(`${c}${n}`).numFmt = money; });
+          }
+        });
+      }
+    }
+  }
+  if (sales.length) {
+    const sorted = sales.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.branch.localeCompare(b.branch));
+    const sg = new Map();
+    for (const r of sorted) {
+      const p = parseDate(r.date), key = p ? `${p.y}-${String(p.mo).padStart(2,'0')}` : 'UNDATED';
+      if (!sg.has(key)) sg.set(key, []);
+      sg.get(key).push(r);
+    }
+    const heads = ['DATE','TIN','Branch','Month','Year','MIN','Last OR','Vatable Sales','Vat Amount ','Vat Zero Rated Sales','Vat Exempt Sales','Sales Subject to other percentage taxes','REMARKS ','TOTAL'];
+    const widths = [8,16,9,14,8,22,14,18,16,18,18,22,24,16];
+    const bold = { name: 'Calibri', size: 12, bold: true }, mid = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    const total = r => (r.vatable_sales || 0) + (r.vat_amount || 0) + (r.zero_rated || 0) + (r.vat_exempt || 0);
+    const writeRow = (ws, n, r) => {
+      const p = parseDate(r.date);
+      ws.getCell(`A${n}`).value = p ? p.d : r.date; ws.getCell(`B${n}`).value = r.tin; ws.getCell(`C${n}`).value = r.branch;
+      ws.getCell(`D${n}`).value = p ? MONTHS_[p.mo - 1] : ''; ws.getCell(`E${n}`).value = p ? p.y : '';
+      ws.getCell(`F${n}`).value = r.min; ws.getCell(`G${n}`).value = r.last_or;
+      [['H', r.vatable_sales], ['I', r.vat_amount], ['J', r.zero_rated], ['K', r.vat_exempt]].forEach(([c, v]) => { const cell = ws.getCell(`${c}${n}`); cell.value = v; cell.numFmt = money; });
+      ws.getCell(`M${n}`).value = r.remarks;
+      const t = ws.getCell(`N${n}`); t.value = { formula: `H${n}+I${n}+J${n}+K${n}`, result: total(r) }; t.numFmt = money;
+    };
+    for (const key of [...sg.keys()].sort()) {
+      const rs = sg.get(key), p0 = key === 'UNDATED' ? null : { y: +key.slice(0, 4), mo: +key.slice(5) };
+      const ws = wb.addWorksheet(sheetName(p0 ? MONTHS_[p0.mo - 1] + ' ' + p0.y : 'UNDATED SALES'));
+      heads.forEach((h, i) => { const c = ws.getCell(1, i + 1); c.value = h; c.font = bold; c.alignment = mid; ws.getColumn(i + 1).width = widths[i]; });
+      ws.getRow(1).height = 48;
+      const main = rs.filter(r => r.branch === '000'), br = rs.filter(r => r.branch !== '000');
+      let n = 3;
+      main.forEach(r => { writeRow(ws, n++, r); });
+      if (br.length) {
+        n += 1; ws.mergeCells(`A${n}:N${n + 1}`);
+        const b = ws.getCell(`A${n}`); b.value = 'BRANCH'; b.font = bold; b.alignment = { horizontal: 'center', vertical: 'middle' };
+        n += 3; br.forEach(r => { writeRow(ws, n++, r); });
+      }
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+    }
+    const zs = wb.addWorksheet(sheetName('ALL Z-READINGS'));
+    const zh = ['DATE','TIN','BRANCH','REGISTERED NAME','MIN','LAST OR','VATABLE SALES','VAT AMOUNT','ZERO RATED','VAT EXEMPT','TOTAL','NET SALES (READ)','REMARKS','SOURCE FILE','CHECKED'];
+    zh.forEach((h, i) => {
+      const c = zs.getCell(1, i + 1); c.value = h; c.font = bold; c.alignment = mid;
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7EFEA' } };
+      zs.getColumn(i + 1).width = [12,16,9,34,22,14,16,14,14,14,16,18,22,30,10][i];
+    });
+    sorted.forEach((r, i) => {
+      const n = 2 + i, p = parseDate(r.date), dc = zs.getCell(n, 1);
+      if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm/dd/yyyy'; } else dc.value = r.date;
+      zs.getCell(n, 2).value = r.tin; zs.getCell(n, 3).value = r.branch; zs.getCell(n, 4).value = r.name; zs.getCell(n, 5).value = r.min; zs.getCell(n, 6).value = r.last_or;
+      [r.vatable_sales, r.vat_amount, r.zero_rated, r.vat_exempt].forEach((v, j) => { const c = zs.getCell(n, 7 + j); c.value = v; c.numFmt = money; });
+      const t = zs.getCell(n, 11); t.value = { formula: `G${n}+H${n}+I${n}+J${n}`, result: total(r) }; t.numFmt = money;
+      const nt = zs.getCell(n, 12); nt.value = r.net_sales; nt.numFmt = money;
+      zs.getCell(n, 13).value = r.remarks; zs.getCell(n, 14).value = r.source; zs.getCell(n, 15).value = r.checked;
+    });
+    zs.views = [{ state: 'frozen', ySplit: 1 }];
+    zs.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(2, sorted.length + 1), column: zh.length } };
+  }
+  const t = wb.addWorksheet('TRIAL');
+  t.getCell('A1').value = 'TRIAL VERSION'; t.getCell('A1').font = { bold: true, size: 14 };
+  t.getCell('A2').value = 'This file was made with a trial of Receipt to Excel by ' + contact.name + '.';
+  t.getCell('A3').value = 'Contact: ' + contact.email + ' / ' + contact.phone;
+  if (contact.client) t.getCell('A4').value = 'Client: ' + contact.client;
+  t.getColumn('A').width = 80;
+  return wb;
+}
+function saveBlob(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const safeName = s => String(s).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+const fileName = (c, m) => 'TRIAL_' + safeName(c.name) + '_' + (m || 'ALL') + '.xlsx';
+async function downloadClient(cid){
+  const c = clientOf(cid); if (!c) return;
+  if (!window.ExcelJS) { toast('The Excel library did not load. Reload the page.'); return; }
+  const { rows, sales } = exportSets(cid, st.month);
+  if (!rows.length && !sales.length) { toast('No approved records for ' + c.name + (st.month ? ' in ' + ml(st.month) : '') + ' yet.'); return; }
+  try {
+    const wb = buildWorkbook(ExcelJS, rows, { ...CONTACT, client: c.name + ' (' + c.tin + ')' }, sales);
+    const buf = await wb.xlsx.writeBuffer();
+    saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName(c, st.month));
+    await log('Exported Excel file ' + fileName(c, st.month), cid);
+    const un = REC.filter(r => r.client === cid && r.state === 'pending').length;
+    toast(un ? `Saved. ${un} record${un > 1 ? 's' : ''} for this client are still pending and were left out.` : 'Saved to your Downloads folder.');
+  } catch (e) { toast('Could not make the Excel file.'); }
+}
+function vExport(){
+  if (!CL.length) return `<div class="card empty">Add a client first.</div>`;
+  if (!st.client) {
+    return `<div class="card"><h2>Export to Excel${st.month ? ' for ' + ml(st.month) : ''}</h2><p class="note">One workbook per client, in the office's layout. Only approved records are included. Pick a client at the top to preview its sheets.</p>
+    <div class="tw" style="margin-top:10px"><table><thead><tr><th>Client</th><th>Workbook</th><th class="n">VAT rows</th><th class="n">NON-VAT rows</th><th class="n">Z-Readings</th><th class="n">Pending</th><th></th></tr></thead><tbody>${CL.map(c => { const { rows, sales } = exportSets(c.id, st.month); return `<tr style="cursor:default"><td class="ttl"><b>${esc(c.name)}</b></td><td class="mono hm" data-l="Workbook">${esc(fileName(c, st.month))}</td><td class="n" data-l="VAT rows">${rows.filter(r => r.vat_type === 'VAT').length}</td><td class="n" data-l="NON-VAT rows">${rows.filter(r => r.vat_type !== 'VAT').length}</td><td class="n" data-l="Z-Readings">${c.sales ? sales.length : 'n/a'}</td><td class="n" data-l="Pending">${REC.filter(r => r.client === c.id && r.state === 'pending').length}</td><td><button class="btn ghost small" data-dl="${c.id}">Download</button></td></tr>`; }).join('')}</tbody></table></div></div>`;
+  }
+  const c = clientOf(st.client), m = st.month, mlabel = m ? MONTHS[+m.slice(5) - 1] : 'ALL MONTHS';
+  const { rows: p, sales: s } = exportSets(c.id, m), pv = p.filter(r => r.vat_type === 'VAT'), pn = p.filter(r => r.vat_type !== 'VAT');
+  const names = [`ALL RECEIPTS (${p.length})`, `${mlabel} PUR-VAT (${pv.length})`, `${mlabel} PUR-NONVAT (${pn.length})`, ...(c.sales ? [`${mlabel} ESALES (${s.length})`, `ALL Z-READINGS (${s.length})`] : [])];
+  const x = Math.min(st.xs, names.length - 1), sorted = a => a.slice().sort((a, b) => a.date.localeCompare(b.date));
+  let prev = '';
+  if (x <= 2) {
+    const rows = sorted(x === 0 ? p : x === 1 ? pv : pn).slice(0, 8), vat = x === 1;
+    prev = `<table><thead><tr><th>DATE</th><th>OR/SI/DR</th><th>TIN</th><th>REGISTERED NAME</th><th class="n">GROSS TAXABLE</th>${vat ? '<th class="n">INPUT TAX</th><th class="n">VATABLE PURCHASES</th><th class="n">TOTAL</th>' : x === 0 ? '<th>VAT / NON-VAT</th>' : ''}</tr></thead><tbody>${rows.map(r => { const v = (r.total || 0) * 100 / 112, i = v * .12; return `<tr style="cursor:default"><td>${esc(r.date)}</td><td>${esc(r.doc_no)}</td><td>${esc(r.tin)}</td><td>${esc(r.name)}</td><td class="n">${peso(r.total)}</td>${vat ? `<td class="n">${peso(i)}</td><td class="n">${peso(v)}</td><td class="n">${peso(i + v)}</td>` : x === 0 ? `<td>${r.vat_type}</td>` : ''}</tr>`; }).join('') || '<tr style="cursor:default"><td colspan="6" class="empty">No approved rows yet.</td></tr>'}</tbody></table>`;
+  } else {
+    const rows = sorted(s).slice(0, 8);
+    prev = `<table><thead><tr><th>DATE</th><th>TIN</th><th>BRANCH</th><th>MIN</th><th>LAST OR</th><th class="n">VATABLE</th><th class="n">VAT</th><th class="n">ZERO RATED</th><th class="n">EXEMPT</th></tr></thead><tbody>${rows.map(r => `<tr style="cursor:default"><td>${esc(r.date)}</td><td>${esc(r.tin)}</td><td>${r.branch}</td><td>${esc(r.min)}</td><td>${esc(r.last_or)}</td><td class="n">${peso(r.vatable_sales)}</td><td class="n">${peso(r.vat_amount)}</td><td class="n">${peso(r.zero_rated)}</td><td class="n">${peso(r.vat_exempt)}</td></tr>`).join('') || '<tr style="cursor:default"><td colspan="9" class="empty">No approved rows yet.</td></tr>'}</tbody></table>`;
+  }
+  return `<div class="card"><h2>Export to Excel · ${esc(c.name)}</h2><p class="note">One workbook in the office's own layout: a VAT and a NON-VAT purchases sheet per month${c.sales ? ', the ESALES sheet' : ''}, and a master sheet so everything can be filtered and searched in Excel. Only approved records are included.</p>
+   <div class="bar"><span class="count">Month: ${m ? ml(m) : 'all months'} (change it at the top)</span><span style="flex:1"></span><button class="btn" data-dl="${c.id}">Download Excel file</button></div>
+   <div class="sheets">${names.map((n, i) => `<button class="sheet ${i === x ? 'on' : ''}" data-xs="${i}">${n}</button>`).join('')}</div>
+   <div class="tw nom" style="max-height:none">${prev}</div><p class="note nom" style="margin-top:8px">First 8 rows shown. Input tax and vatable purchases are real Excel formulas, like in the office's template.</p></div>`;
+}
+const vActivity = () => {
+  const rows = LOG.filter(l => !st.client || l.client === st.client);
+  return `<div class="card"><h2>Activity${st.client ? ' · ' + esc(cname(st.client)) : ''}</h2><p class="note">Who added, approved, changed and signed off, and when. Kept in this browser. Nothing here can be edited.</p>
+  <div class="log" style="margin-top:8px">${rows.map(l => `<div><span class="t">${l.t}</span><span class="u">${esc(l.who)}</span><span>${st.client ? '' : esc(cname(l.client)) + ': '}${esc(l.act)}</span></div>`).join('') || '<div class="empty">No activity yet.</div>'}</div></div>`;
+};
+
+/* ---------- backup ---------- */
+const blobToDataUrl = b => new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); });
+const dataUrlToBlob = u => fetch(u).then(r => r.blob());
+async function makeBackup(){
+  toast('Preparing the backup...');
+  const scans = {};
+  for (const r of REC) { const b = await getScan(r.id); if (b) scans[r.id] = await blobToDataUrl(b); }
+  const data = { app: 'blyss-receipt-firm', version: 1, saved: new Date().toISOString(), clients: CL, records: REC, log: LOG, sign: SIGN, user: USER, scans };
+  saveBlob(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'receipt-backup-' + new Date().toISOString().slice(0, 10) + '.json');
+  await log('Downloaded a backup', '');
+  toast('Backup saved to your Downloads folder.');
+}
+async function restoreBackup(file){
+  try {
+    const d = JSON.parse(await file.text());
+    if (d.app !== 'blyss-receipt-firm') throw new Error('not a backup');
+    for (const s of ['clients', 'records', 'scans', 'log', 'meta']) await dbClear(s);
+    MEMSCANS.clear(); URLS.clear();
+    CL = d.clients || []; REC = d.records || []; LOG = d.log || []; SIGN = d.sign || {}; USER = d.user || 'Staff';
+    for (const c of CL) await dbPut('clients', c);
+    for (const r of REC) { await dbPut('records', r); }
+    for (const [id, u] of Object.entries(d.scans || {})) await putScan(id, await dataUrlToBlob(u));
+    for (const l of [...LOG].reverse()) await dbAdd('log', l);
+    await saveSign(); await dbPut('meta', USER, 'user');
+    st.confirm = ''; st.client = ''; toast('Backup restored.'); draw();
+  } catch (e) { toast('That file is not a backup from this tool.'); }
+}
+function vBackup(){
+  const n = REC.filter(approved).length;
+  return `<div class="card"><h2>Backup and restore</h2><p class="note">Your clients, records, scans and activity are kept in this browser on this computer only. They are not on our server. Clearing the browser's site data deletes them, and they do not appear on other computers. Download a backup now and then.</p>
+  <div class="bar"><button class="btn" id="bkDl">Download backup</button><span class="count">${CL.length} client${CL.length === 1 ? '' : 's'}, ${n} approved record${n === 1 ? '' : 's'}, ${REC.length - n} waiting</span></div>
+  <div class="bar" style="margin-top:18px"><button class="btn ghost" id="bkRestore">${st.confirm === 'restore' ? 'Press again to choose the file' : 'Restore from a backup file'}</button><span class="count">Restoring replaces everything now in this browser.</span></div>
+  <p class="note" id="stor"></p></div>
+  <div class="card" style="margin-top:12px"><h2>Sample data</h2><p class="note">Fake clients, receipts and Z-Readings so you can try every screen without using up trial receipts. They are clearly named (SAMPLE) and never mix with your real clients.</p>
+  <div class="bar"><button class="btn ghost" data-sample>Load sample data</button><button class="btn danger" data-nosample>Remove sample data</button></div></div>
+  <div class="card" style="margin-top:12px"><h2>What the paid version adds</h2><p class="note">Records and scans kept online so any computer in the office can open them, staff logins with separate preparer and reviewer roles, a full audit trail, and automatic backups.</p></div>`;
+}
+
+/* ---------- render + events ---------- */
+function draw(){
+  if ($('#app').hidden) return;
+  drawNav(); drawTop();
+  const keep = document.activeElement && document.activeElement.id === 'nm';
+  $('#view').innerHTML = st.tab === 'dashboard' ? vDash() : st.tab === 'upload' ? vUpload() : st.tab === 'review' ? vReview() : st.tab === 'purchases' ? vRecords('purchase') : st.tab === 'sales' ? vRecords('sale') : st.tab === 'export' ? vExport() : st.tab === 'activity' ? vActivity() : st.tab === 'help' ? vHelp() : vBackup();
+  hydrate();
+  if (st.tab === 'backup' && navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { const el = $('#stor'); if (el && e.usage != null) el.textContent = `Using about ${(e.usage / 1048576).toFixed(1)} MB of the space this browser allows (${((e.quota || 0) / 1073741824).toFixed(1)} GB).`; }).catch(() => {});
+}
+$('#view').addEventListener('click', async e => {
+  const t = e.target; let b;
+  if (t.closest('[data-add]')) { st.tab = st.tab === 'upload' ? 'dashboard' : st.tab; if (st.tab !== 'dashboard') st.tab = 'dashboard'; st.client = ''; st.editing = 'new'; draw(); const n = $('#nc-name'); if (n) n.focus(); return; }
+  if (t.closest('[data-sample]')) { loadSamples(); return; }
+  if (t.closest('[data-nosample]')) { removeSamples(); return; }
+  if (b = t.closest('[data-edit]')) { st.editing = b.dataset.edit; draw(); return; }
+  if (t.closest('#cancelClient')) { st.editing = null; draw(); return; }
+  if (t.closest('#saveClient')) {
+    const name = $('#nc-name').value.trim(); if (!name) { toast('Enter the business name first.'); return; }
+    const tin = $('#nc-tin').value.trim(), dg = digits(tin);
+    if (tin && dg.length !== 9 && dg.length !== 12) { toast('The TIN should have 9 digits, or 12 with the branch code.'); return; }
+    const vals = { name, tin: tin || 'not set', vat: $('#nc-vat').value, who: $('#nc-who').value.trim(), sales: $('#nc-reg').value === 'yes', due: digits($('#nc-due').value).slice(0, 2) };
+    if (st.editing && st.editing !== 'new') { const c = clientOf(st.editing); Object.assign(c, vals); await dbPut('clients', c); await log('Edited client details', c.id); st.editing = null; toast('Client updated.'); }
+    else { const c = { id: 'c' + uid(), ...vals }; CL.push(c); await dbPut('clients', c); st.client = c.id; st.editing = null; await log('Added client ' + name, c.id); toast(name + ' added.'); }
+    draw(); return;
+  }
+  if (b = t.closest('tr[data-client]')) { st.client = b.dataset.client; draw(); return; }
+  if (t.closest('[data-all]')) { st.client = ''; draw(); return; }
+  if (b = t.closest('[data-sign]')) {
+    const to = b.dataset.sign, k = signKey(st.client, curMonth()); SIGN[k] = to; await saveSign();
+    await log(({ reviewed: 'Marked ' + ml(curMonth()) + ' as reviewed', locked: 'Locked ' + ml(curMonth()), open: 'Reopened ' + ml(curMonth()) })[to] || 'Changed sign-off', st.client); draw(); return;
+  }
+  if (b = t.closest('[data-go]')) { st.tab = b.dataset.go; draw(); return; }
+  if (b = t.closest('[data-k]')) { st.kind = b.dataset.k; draw(); return; }
+  if (t.closest('#addBtn')) { $('#file').click(); return; }
+  if (t.closest('#camBtn')) { $('#cam').click(); return; }
+  if (t.closest('#stopBtn')) { st.stopped = true; if (extract.ctl) extract.ctl.abort(); return; }
+  if (b = t.closest('[data-rv]')) { st.review = b.dataset.rv; st.tab = 'review'; draw(); return; }
+  if (b = t.closest('[data-retry]')) { const r = REC.find(x => x.id === b.dataset.retry); r.state = 'queued'; r.error = ''; await saveRec(r); draw(); pump(); return; }
+  if (b = t.closest('[data-rotate]')) { const r = REC.find(x => x.id === b.dataset.rotate); rotateAndRetry(r); return; }
+  if (b = t.closest('[data-remove]')) { const id = b.dataset.remove; REC = REC.filter(x => x.id !== id); PARTS.delete(id); URLS.delete(id); MEMSCANS.delete(id); await dbDel('records', id); await dbDel('scans', id); draw(); return; }
+  if (t.closest('#approve')) { approve(); return; }
+  if (t.closest('#skip')) { const r = REC.filter(i => i.state === 'pending' && (!st.client || i.client === st.client)).sort((a, b) => a.created - b.created); const k = r.findIndex(i => i.id === st.review); st.review = (r[(k + 1) % r.length] || r[0]).id; draw(); return; }
+  if (t.closest('[data-close]')) { st.sel = null; draw(); return; }
+  if (b = t.closest('[data-reopen]')) { const r = REC.find(x => x.id === b.dataset.reopen); r.state = 'pending'; await saveRec(r); await log('Reopened ' + (r.kind === 'sale' ? 'Z-Reading ' + r.last_or : 'receipt ' + r.doc_no) + ' for editing', r.client); st.sel = null; st.review = r.id; st.tab = 'review'; draw(); return; }
+  if (b = t.closest('[data-del]')) {
+    const id = b.dataset.del;
+    if (st.confirm !== id) { st.confirm = id; draw(); return; }
+    const r = REC.find(x => x.id === id); REC = REC.filter(x => x.id !== id); URLS.delete(id); MEMSCANS.delete(id); await dbDel('records', id); await dbDel('scans', id);
+    await log('Removed ' + (r.kind === 'sale' ? 'Z-Reading ' + r.last_or : 'receipt ' + r.doc_no), r.client); st.sel = null; st.confirm = ''; draw(); return;
+  }
+  if (b = t.closest('th[data-sk]')) { const s = st.tab === 'sales' ? 'ssort' : 'psort'; st[s] = st[s][0] === b.dataset.sk ? [b.dataset.sk, -st[s][1]] : [b.dataset.sk, 1]; draw(); return; }
+  if (b = t.closest('tr[data-id]')) { st.sel = b.dataset.id; st.confirm = ''; draw(); return; }
+  if (b = t.closest('[data-xs]')) { st.xs = +b.dataset.xs; draw(); return; }
+  if (b = t.closest('[data-dl]')) { downloadClient(b.dataset.dl); return; }
+  if (t.closest('#bkDl')) { makeBackup(); return; }
+  if (t.closest('#bkRestore')) { if (st.confirm !== 'restore') { st.confirm = 'restore'; draw(); } else { $('#restoreFile').click(); } return; }
+});
+$('#view').addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.fl) { st.f[t.dataset.fl] = t.value; const pos = t.selectionStart; draw(); if (t.dataset.fl === 'q') { const n = $('[data-fl="q"]'); n.focus(); n.setSelectionRange(pos, pos); } return; }
+  if (t.id === 'tManual' || t.id === 'tCheck') { st[t.id] = t.value; const id = t.id, p = t.selectionStart; draw(); const n = $('#' + id); n.focus(); n.setSelectionRange(p, p); return; }
+  if (t.dataset.f && t.tagName === 'INPUT') {
+    const r = REC.find(x => x.id === st.review); if (!r) return;
+    r[t.dataset.f] = t.value; r.flags = r.flags.filter(x => x !== t.dataset.f); t.classList.remove('warn'); r.ack = false;
+    $('#rvbox').innerHTML = boxesHTML(r);
+  }
+});
+$('#view').addEventListener('change', async e => {
+  const t = e.target;
+  if (t.id === 'ucl') { st.uclient = t.value; draw(); return; }
+  if (t.id === 'ack') { const r = REC.find(x => x.id === st.review); if (r) { r.ack = t.checked; $('#rvbox').innerHTML = boxesHTML(r); } return; }
+  if (t.dataset.fl) { st.f[t.dataset.fl] = t.value; draw(); return; }
+  if (t.dataset.f) { const r = REC.find(x => x.id === st.review); if (r) { if (t.tagName === 'SELECT') { r[t.dataset.f] = t.value; r.flags = r.flags.filter(x => x !== t.dataset.f); $('#rvbox').innerHTML = boxesHTML(r); } await saveRec(r); } }
+});
+$('#file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+$('#cam').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+$('#restoreFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) restoreBackup(f); };
+document.addEventListener('dragover', e => { if ($('#drop')) { e.preventDefault(); $('#drop').classList.add('over'); } });
+document.addEventListener('dragleave', e => { if ($('#drop')) $('#drop').classList.remove('over'); });
+document.addEventListener('drop', e => { if ($('#drop')) { e.preventDefault(); $('#drop').classList.remove('over'); addFiles([...e.dataTransfer.files]); } });
+</script>
+<script>
+(function(){
+// ---- Static (no server) mode: the photo is read inside the phone, then plain code fills the fields. ----
+// Change these three lines for each trial.
+const LOCAL_TRIAL = { code: 'JADJ-TRIAL', max: 30, expires: '2026-11-15' };
+const TESS_BASE = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/';
+const TESS_CORE = 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.0/';
+const TESS_LANG = 'https://tessdata.projectnaptha.com/4.0.0_fast';
+let _tw = null;
+async function getOcr() {
+  if (_tw) return _tw;
+  const cfg = window.TESS_CFG || { workerPath: TESS_BASE + 'worker.min.js', corePath: TESS_CORE, langPath: TESS_LANG };
+  const w = await Tesseract.createWorker('eng', 1, cfg);
+  await w.setParameters({ tessedit_pageseg_mode: '6' });
+  return (_tw = w);
+}
+async function ocrParts(parts) {
+  const w = await getOcr(), out = [];
+  for (const b64 of parts) { const r = await w.recognize('data:image/jpeg;base64,' + b64); out.push(r.data.text || ''); }
+  return out.join('\n');
+}
+// ---- Rules mode: no AI. Plain code reads the OCR text and fills the same fields the AI would. ----
+const R_MONEY = /(\d{1,3}(?:,\d{3})+|\d+)\s?\.\s?(\d{2})(?!\d)/g;
+function moneyIn(s) { const out = []; let m; R_MONEY.lastIndex = 0; while ((m = R_MONEY.exec(String(s)))) out.push(Number(m[1].replace(/,/g, "") + "." + m[2])); return out; }
+function fmtTin(s) {
+  const d = String(s).replace(/\D/g, "");
+  if (d.length < 9) return null;
+  const x = d.slice(0, 12).padEnd(12, "0");
+  return `${x.slice(0, 3)}-${x.slice(3, 6)}-${x.slice(6, 9)}-${x.slice(9, 12)}`;
+}
+const TIN_RE = /(\d{3})[\s\-.]?(\d{3})[\s\-.]?(\d{3})(?:[\s\-.]?(\d{3,5}))?/;
+function findTin(lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const at = l.search(/\bTIN\b/i);
+    if (at < 0 || /printer/i.test(l)) continue;
+    const m = l.slice(at).match(TIN_RE);
+    if (m && (m[1] + m[2] + m[3]).length === 9) return { tin: fmtTin(m[0]), line: i };
+  }
+  return null;
+}
+const JUNK = (s) => { const t = s.replace(/\s/g, ""); if (t.length < 3) return true; const ok = (t.match(/[A-Za-z0-9&.,'\-/()]/g) || []).length; return ok / t.length < 0.85 || !/[A-Za-z]{3,}/.test(s); };
+const ADDR = /\b(purok|st\.?|street|rd\.?|road|city|brgy|barangay|blvd|ave|avenue|highway|km|benguet|baguio|kalinga|tabuk|trinidad|isabela|pangasinan|manila|philippines|poblacion|sitio|zone)\b/i;
+function validDate(y, m, d) { return y >= 2000 && y <= 2099 && m >= 1 && m <= 12 && d >= 1 && d <= 31; }
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+function findDate(lines, avoid) {
+  const skip = /issued|expir|accredit|authority|valid until|printed|permit|ptu|atp/i;
+  const cands = [];
+  lines.forEach((l, i) => {
+    if (skip.test(l)) return;
+    let m;
+    const iso = /(20\d{2})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/g;
+    while ((m = iso.exec(l))) if (validDate(+m[1], +m[2], +m[3])) cands.push({ y: +m[1], m: +m[2], d: +m[3], amb: false, i, lab: /date/i.test(l) });
+    const dmy = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](20\d{2}|\d{2})(?!\d)/g;
+    while ((m = dmy.exec(l))) {
+      let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000;
+      let mo = a, d = b, amb = a <= 12 && b <= 12 && a !== b;
+      if (a > 12 && b <= 12) { mo = b; d = a; amb = false; }
+      if (validDate(y, mo, d)) cands.push({ y, m: mo, d, amb, i, lab: /date/i.test(l) });
+    }
+    const nm = new RegExp("(" + MONTHS.join("|") + ")[a-z]*\\.?\\s+(\\d{1,2}),?\\s+(20\\d{2})", "ig");
+    while ((m = nm.exec(l))) { const mo = MONTHS.indexOf(m[1].toLowerCase()) + 1; if (validDate(+m[3], mo, +m[2])) cands.push({ y: +m[3], m: mo, d: +m[2], amb: false, i, lab: true }); }
+  });
+  if (!cands.length) return null;
+  const c = cands.find((x) => x.lab) || cands[0];
+  return { iso: `${c.y}-${String(c.m).padStart(2, "0")}-${String(c.d).padStart(2, "0")}`, amb: c.amb };
+}
+function amountOnLine(lines, re, not) {
+  for (let i = 0; i < lines.length; i++) {
+    if (!re.test(lines[i]) || (not && not.test(lines[i]))) continue;
+    let a = moneyIn(lines[i]); if (!a.length && lines[i + 1]) a = moneyIn(lines[i + 1]);
+    if (a.length) return a[a.length - 1];
+  }
+  return null;
+}
+const cleanLines = (t) => String(t).split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+
+function parsePurchaseText(text) {
+  const lines = cleanLines(text), unsure = [], out = { date: null, doc_no: null, tin: null, name: null, address: null, buyer_name: null, buyer_tin: null, total: null, vat_type: null, doc_type: null, not_valid_for_input_tax: false };
+  const t = findTin(lines);
+  if (t) out.tin = t.tin; else unsure.push("tin");
+  // seller name and address: the clean lines above the TIN line
+  const top = lines.slice(0, t ? Math.max(t.line + 1, 3) : 6).filter((l) => !/\bTIN\b/i.test(l));
+  const nameLines = [], addrLines = [];
+  for (const l of top) {
+    if (JUNK(l)) continue;
+    if (ADDR.test(l) && !(l === lines[0] && !nameLines.length && !/purok|brgy|street|\bst\.|\brd\b|road|\d{3,}/i.test(l))) { addrLines.push(l); continue; }
+    if (/tel|phone|cellphone|email|@|www\./i.test(l)) continue;
+    if (nameLines.length < 2 && !addrLines.length) nameLines.push(l);
+  }
+  if (nameLines.length) out.name = nameLines.join(" ").slice(0, 80); else unsure.push("name");
+  if (addrLines.length) out.address = addrLines.join(", ").slice(0, 120); else unsure.push("address");
+  if (out.name && (!t || t.line > 5)) unsure.push("name");
+  const dt = findDate(lines);
+  if (dt) { out.date = dt.iso; if (dt.amb) unsure.push("date"); } else unsure.push("date");
+  // document number
+  let no = null, weak = false, m2;
+  for (const l of lines) {
+    if (/printer|accredit|bklts|authority|ptu|permit|plate|serial|machine|trans/i.test(l)) continue;
+    const m = l.match(/\b(?:S[1Il]{1,2}|SI)\s*#\s*[:.]?\s*([A-Z]{0,3}\d[\d\-]{3,})/i) || l.match(/\b(?:S\.?I\.?|O\.?R\.?|D\.?R\.?|C\.?R\.?|INV(?:OICE)?\.?|RECEIPT|SALES\s+INVOICE)\s*(?:NO\.?|#|NUMBER)\s*[:.\-\\]?\s*([A-Z]{0,3}\d[\d\-]{2,})/i) || ((m2 = l.match(/\bNo\.?\s*[:\\]?\s*([A-Z]{0,3}\d[\d\-]{3,})/)) && (weak = true, m2));
+    if (m) { no = m[1]; break; }
+  }
+  if (no && /^[O0]\d/.test(no)) no = no.replace(/O/g, "0");
+  if (no) out.doc_no = no; else unsure.push("doc_no");
+  if (no && weak) unsure.push("doc_no");
+  // total
+  let tot = amountOnLine(lines, /total\s*(amount)?\s*due|amount\s*due|grand\s*total|total\s*sales|amount\s*paid|\btotal\b/i, /vat|less|sub|zero|exempt|net\s*of/i);
+  if (tot == null) { const all = moneyIn(lines.join("\n")); if (all.length) { tot = Math.max(...all); unsure.push("total"); } else unsure.push("total"); }
+  out.total = tot;
+  // VAT or NON-VAT
+  const head = lines.slice(0, 12).join(" \n ");
+  if (/non[\s\-]*vat/i.test(head)) out.vat_type = "NON-VAT"; else if (/vat[\s\-]*reg|vat\s*registered|\bvat\b.*\btin\b/i.test(head) || /vat[\s\-]*reg/i.test(lines.join(" "))) out.vat_type = "VAT"; else unsure.push("vat_type");
+  if (/not\s+valid\s+for\s+(claiming\s+)?input\s+tax/i.test(lines.join(" "))) out.not_valid_for_input_tax = true;
+  const all = lines.join(" ");
+  out.doc_type = /collection\s+receipt/i.test(all) ? "Collection Receipt" : /delivery\s+receipt/i.test(all) ? "Delivery Receipt" : /official\s+receipt/i.test(all) ? "Official Receipt" : /cash\s+sales/i.test(all) ? "Cash Sales Invoice" : /sales\s+invoice/i.test(all) ? "Sales Invoice" : /invoice/i.test(all) ? "Invoice" : /receipt/i.test(all) ? "Receipt" : null;
+  // buyer (only when it reads cleanly)
+  for (const l of lines) {
+    const m = l.match(/\b(?:sold\s+to|customer\s+name|cust\.?\s*name|registered\s+name|delivered\s+to|received\s+from)\s*[:.]\s*(.{3,60})$/i);
+    if (m && !JUNK(m[1]) && !/^(tin|address)/i.test(m[1])) { out.buyer_name = m[1].trim(); break; }
+  }
+  if (out.buyer_name) unsure.push("buyer_name");
+  quality(lines, unsure, ["name", "date", "total", "doc_no"]);
+  if (out.name && shortTokens(out.name) > 0.3) unsure.push("name");
+  out.uncertain = [...new Set(unsure)];
+  return out;
+}
+
+function shortTokens(s) { const w = s.split(/\s+/); return w.filter((x) => x.length <= 2).length / w.length; }
+function quality(lines, unsure, keys) { const bad = lines.filter(JUNK).length / Math.max(1, lines.length); if (bad > 0.45) unsure.push(...keys); }
+
+function parseZText(text) {
+  const lines = cleanLines(text), unsure = [], out = { report_type: null, date: null, tin: null, name: null, min: null, terminal: null, first_or: null, last_or: null, vatable_sales: null, vat_amount: null, zero_rated: null, vat_exempt: null, net_sales: null, gross_sales: null };
+  out.report_type = /z[\s\-]*read/i.test(text) ? "Z" : /x[\s\-]*read/i.test(text) ? "X" : null; if (!out.report_type) unsure.push("report_type");
+  const t = findTin(lines); if (t) out.tin = t.tin; else unsure.push("tin");
+  const nm = lines.slice(0, 5).find((l) => !JUNK(l) && !/\bTIN\b|tel|z[\s\-]*read|\bmin\b/i.test(l)); if (nm) out.name = nm.slice(0, 80); else unsure.push("name");
+  const mm = text.match(/\bMIN\b[\s:#.\-]*([0-9][0-9\s]{7,})/i); if (mm) out.min = mm[1].replace(/\D/g, ""); else unsure.push("min");
+  const zi = lines.findIndex((l) => /z[\s\-]*read/i.test(l));
+  const near = zi >= 0 ? lines.slice(zi, zi + 6) : lines;
+  const dt = findDate(near.filter((l) => !/printed/i.test(l))) || findDate(lines.filter((l) => !/printed/i.test(l)));
+  if (dt) { out.date = dt.iso; if (dt.amb) unsure.push("date"); } else unsure.push("date");
+  const endNo = text.match(/end(?:ing)?\s*(?:invoice|or|si)?\s*(?:no\.?|number|#)?\s*[:.\-]?\s*([0-9]{4,})/i); if (endNo) out.last_or = endNo[1]; else unsure.push("last_or");
+  const stNo = text.match(/(?:start(?:ing)?|begin(?:ning)?)\s*(?:invoice|or|si)?\s*(?:no\.?|number|#)?\s*[:.\-]?\s*([0-9]{4,})/i); if (stNo) out.first_or = stNo[1];
+  const tm = text.match(/terminal\s*(?:no\.?|#|number)?\s*[:.\-]?\s*([A-Za-z0-9\-]{1,10})/i); if (tm && !/^(no|number)$/i.test(tm[1])) out.terminal = tm[1];
+  const get = (re, not, key) => { const v = amountOnLine(lines, re, not); out[key] = v; if (v == null) unsure.push(key); };
+  get(/vat(?:able)?\s*sales?/i, /less|exempt|zero|net/i, "vatable_sales");
+  get(/vat\s*amount|output\s*vat/i, /less/i, "vat_amount");
+  get(/zero[\s\-]*rated/i, /less/i, "zero_rated");
+  get(/vat[\s\-]*exempt/i, /less/i, "vat_exempt");
+  get(/net\s*sales/i, null, "net_sales");
+  const g = amountOnLine(lines, /gross\s*sales/i); out.gross_sales = g;
+  quality(lines, unsure, ["vatable_sales", "vat_amount", "net_sales", "date"]);
+  out.uncertain = [...new Set(unsure)];
+  return out;
+}
+
+function _used() { try { return Number(localStorage.getItem('trialUsed:' + LOCAL_TRIAL.code.toLowerCase())) || 0; } catch (e) { return 0; } }
+function _info() { return { remaining: Math.max(0, LOCAL_TRIAL.max - _used()), max: LOCAL_TRIAL.max, expires: LOCAL_TRIAL.expires }; }
+window.callApi = async function(payload, signal) {
+  if (String(payload.code || '').trim().toLowerCase() !== LOCAL_TRIAL.code.toLowerCase()) throw { code: 'bad_code' };
+  if (LOCAL_TRIAL.expires && Date.now() > new Date(LOCAL_TRIAL.expires + 'T23:59:59+08:00').getTime()) throw { code: 'expired', info: _info() };
+  if (_used() >= LOCAL_TRIAL.max) throw { code: 'limit', info: _info() };
+  if (payload.action === 'status') return { ok: true, ..._info() };
+  let text;
+  try { text = await ocrParts(payload.images); }
+  catch (e) { throw { code: 'upstream', info: { detail: 'the text reader could not start, check the phone signal and try again' } }; }
+  if (signal && signal.aborted) throw { code: 'cancelled' };
+  if (text.trim().length < 20) throw { code: 'upstream', info: { detail: 'no readable text found in this photo' } };
+  const data = payload.kind === 'sale' ? parseZText(text) : parsePurchaseText(text);
+  try { localStorage.setItem('trialUsed:' + LOCAL_TRIAL.code.toLowerCase(), String(_used() + 1)); } catch (e) {}
+  return { ok: true, via: 'local', data, ..._info() };
+}
+
+})();
+</script>
+</body>
+</html>

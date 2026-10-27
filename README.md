@@ -1,3 +1,17 @@
+# Deploy on Cloudflare Pages (free, no 10-second limit)
+
+Use this if Netlify credits run out. Same app, same repo.
+
+1. Sign up free at dash.cloudflare.com.
+2. Left menu: Workers and Pages, Create, Pages, Connect to Git, pick the repo (branch main).
+3. Build settings: Framework preset None, Build command empty, Build output directory `public`. Save and Deploy.
+4. Create the trial counter: Workers and Pages, KV, Create a namespace, name it `receipt-trial`.
+5. Open your Pages project, Settings, Bindings, Add, KV namespace. Variable name `TRIAL`, choose the namespace from step 4.
+6. Settings, Variables and Secrets, add (as Secret for the key and code): GEMINI_API_KEY, ACCESS_CODE, TRIAL_MAX (30), TRIAL_EXPIRES (2026-11-15). Optional: GEMINI_MODEL, GEMINI_FALLBACK_MODEL.
+7. Deployments, Retry deployment (so the variables and binding apply). Your link is `<project>.pages.dev`.
+
+The page finds the right function by itself: `/api/read-receipt` on Cloudflare, `/.netlify/functions/read-receipt` on Netlify.
+
 # Receipt to Excel (Trial) - setup
 
 ## 1. Get a free Gemini key (for the trial)

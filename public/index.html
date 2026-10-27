@@ -215,7 +215,7 @@
 <script>
 /* ---- Edit these before you send the link ---- */
 const CONTACT = { name: 'Blyss Digital', email: 'rayann.catindig@gmail.com', phone: '+63 976 148 3535' };
-const ENDPOINT = '/.netlify/functions/read-receipt';
+const ENDPOINT = /netlify\.app$/.test(location.hostname) ? '/.netlify/functions/read-receipt' : '/api/read-receipt';
 /* --------------------------------------------- */
 
 const $ = (s, r = document) => r.querySelector(s);

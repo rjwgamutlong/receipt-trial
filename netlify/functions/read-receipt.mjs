@@ -146,10 +146,14 @@ export default async (req) => {
       parts.push({ text: PROMPTS[body.kind === "sale" ? "sale" : "purchase"] });
       // Google sometimes answers 503 "high demand" or 429 for one model while another is free,
       // so if the first model is overloaded the next one is tried straight away.
+      const t0 = Date.now();
       for (const model of models) {
+        const left = 9000 - (Date.now() - t0);
+        if (left < 1500) break;
         res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: "POST",
           headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          signal: AbortSignal.timeout(left),
           body: JSON.stringify({
             contents: [{ parts }],
             generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2000, thinkingConfig: /^gemini-2/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: "low" } }
@@ -161,8 +165,10 @@ export default async (req) => {
     }
   } catch (e) {
     console.error("Fetch failed", e);
-    return json({ error: "upstream", detail: "could not reach " + provider }, 502);
+    const slow = e && (e.name === "TimeoutError" || e.name === "AbortError");
+    return json({ error: "upstream", detail: slow ? provider + " did not answer in time" : "could not reach " + provider }, 502);
   }
+  if (!res) return json({ error: "upstream", detail: provider + " did not answer in time" }, 502);
   if (!res.ok) {
     let detail = "";
     try { const e = await res.json(); detail = (e.error && (e.error.message || e.error.status)) || ""; } catch {}

@@ -306,9 +306,9 @@ function paintTrial(){ const d = trial.expires ? ' Trial ends ' + trial.expires 
 async function callApi(payload, signal){
   let res;
   try { res = await fetch(ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal }); }
-  catch (e) { if (e.name === 'AbortError') throw { code: 'cancelled' }; throw { code: 'upstream' }; }
-  let data = {}; try { data = await res.json(); } catch (e) {}
-  if (!res.ok) throw { code: data.error || 'upstream', info: data };
+  catch (e) { if (e.name === 'AbortError') throw { code: 'cancelled' }; throw { code: 'upstream', info: { detail: 'no connection to the server, check the phone signal' } }; }
+  let data = {}, bad = false; try { data = await res.json(); } catch (e) { bad = true; }
+  if (!res.ok) throw { code: data.error || 'upstream', info: bad ? { detail: 'server answered HTTP ' + res.status + (res.status === 504 || res.status === 502 ? ' (took too long)' : '') } : data };
   return data;
 }
 async function tryCode(c){

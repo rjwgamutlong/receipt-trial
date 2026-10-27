@@ -27,7 +27,8 @@
   body::before{content:"TRIAL VERSION";position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     font-size:min(14vw,120px);font-weight:700;letter-spacing:.08em;color:var(--ink);opacity:.04;
     transform:rotate(-24deg);pointer-events:none;z-index:50;white-space:nowrap}
-  .wrap{max-width:1120px;margin:0 auto}
+  .wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column}
+  .wrap>.top{order:0}.wrap>#navWrap{order:1}.wrap>#gate,.wrap>#locked,.wrap>#app{order:2}
   button{font:inherit;cursor:pointer}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   select,input[type=search],input[type=text]{font:inherit;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 9px;min-width:0}
@@ -103,19 +104,26 @@
   .tgrid .cell strong{font-family:var(--mono);font-size:18px;font-weight:500}.tgrid input{margin-top:3px;width:100%}
   .ls{display:none}
   #navBtn{display:none}
+  .ts{display:none}
   @media (max-width:640px){
     body{font-size:14px}
     .top{padding:12px 0 8px;gap:8px}.brand b{font-size:16px}.brand span.s{display:none}
     .ctl#topctl{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}
     #topctl label{display:none}#topctl #cli{grid-column:1 / -1;width:100%}#topctl select,#topctl .btn,#topctl input{width:100%;min-height:40px}
     #trialBar{font-size:12px;padding:6px 10px;margin-bottom:8px}
-    #navBtn{display:flex;width:100%;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:600;min-height:44px;text-align:left}
-    nav{display:none;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-bottom:12px;overflow:hidden}
+    .wrap>#navWrap{order:-1}
+    #navWrap{position:sticky;top:0;z-index:45;background:var(--bg);margin:0 -16px 10px;padding:6px 16px;border-bottom:1px solid var(--line)}
+    #navBtn{display:flex;width:100%;align-items:center;gap:12px;min-height:46px;padding:0 12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;font:inherit;font-weight:600;font-size:16px;text-align:left}
+    #navBtn .ic{width:22px;height:16px;position:relative;flex:none;border-top:2px solid currentColor;border-bottom:2px solid currentColor}
+    #navBtn .ic::after{content:"";position:absolute;left:0;right:0;top:50%;margin-top:-1px;border-top:2px solid currentColor}
+    #navBtn .tx{flex:1}
+    nav{display:none;position:absolute;left:16px;right:16px;top:calc(100% - 2px);flex-direction:column;gap:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 10px 30px rgba(0,0,0,.18);overflow:hidden;margin:0}
     nav.open{display:flex}
-    nav button{width:100%;text-align:left;padding:12px 14px;font-size:15px;min-height:46px;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;display:flex;justify-content:space-between;align-items:center}
+    nav button{width:100%;text-align:left;padding:12px 14px;font-size:16px;min-height:48px;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;display:flex;justify-content:space-between;align-items:center;color:var(--ink)}
     nav button:last-child{border-bottom:0}
-    nav button[aria-selected=true]{background:var(--accent-soft);color:var(--ink);box-shadow:inset 3px 0 0 var(--accent)}
+    nav button[aria-selected=true]{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
     nav .n{margin-left:8px;padding:0 7px}
+    .ts{display:inline}.tf{display:none}
     .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{padding:12px}
     .tile .l{font-size:11.5px}.tile b{font-size:18px;margin-top:2px}
     .photo{max-height:42vh}
@@ -131,6 +139,8 @@
 </head>
 <body>
 <div class="wrap">
+  <div id="navWrap" hidden><button id="navBtn" aria-expanded="false" aria-controls="nav" aria-label="Menu"></button>
+    <nav role="tablist" aria-label="Sections" id="nav"></nav></div>
   <div class="top">
     <div class="brand"><b>Receipt to Excel <span class="badge">TRIAL</span></b><span class="s">Receipts and Z-Readings into your own Excel formats, filed by client</span></div>
     <div class="ctl" id="topctl" hidden></div>
@@ -153,8 +163,7 @@
   <div id="app" hidden>
     <div id="trialBar"></div>
     <div id="warnBar" hidden></div>
-    <button id="navBtn" class="btn ghost" aria-expanded="false" aria-controls="nav"></button>
-    <nav role="tablist" aria-label="Sections" id="nav"></nav>
+    
     <main id="view"></main>
   </div>
 </div>
@@ -249,13 +258,13 @@ const ERR = {
   server_setup: 'The trial is not set up yet. Please contact Blyss Digital.'
 };
 function showLocked(kind){
-  $('#gate').hidden = true; $('#app').hidden = true; $('#topctl').hidden = true; $('#locked').hidden = false;
+  $('#gate').hidden = true; $('#app').hidden = true; $('#topctl').hidden = true; $('#navWrap').hidden = true; $('#locked').hidden = false;
   $('#lockTitle').textContent = kind === 'limit' ? 'Trial receipts used up' : 'Your trial has ended';
   $('#lockText').textContent = kind === 'limit' ? 'You have used all the receipts included in this trial.' : 'The trial period is over.';
   $('#lockMail').href = 'mailto:' + CONTACT.email; $('#lockMail').textContent = CONTACT.email;
   $('#lockPhone').href = 'tel:' + CONTACT.phone.replace(/\s/g, ''); $('#lockPhone').textContent = CONTACT.phone;
 }
-function paintTrial(){ const d = trial.expires ? ' Trial ends ' + trial.expires + '.' : ''; $('#trialBar').textContent = `Trial: ${trial.remaining} of ${trial.max} receipts left.${d} Records are kept in this browser only, so download a backup now and then.`; }
+function paintTrial(){ const d = trial.expires ? ' Trial ends ' + trial.expires + '.' : ''; $('#trialBar').innerHTML = `<span class="tf">Trial: ${trial.remaining} of ${trial.max} receipts left.${d} Records are kept in this browser only, so download a backup now and then.</span><span class="ts">Trial: ${trial.remaining} of ${trial.max} left${trial.expires ? ' · ends ' + trial.expires : ''}</span>`; }
 async function callApi(payload, signal){
   let res;
   try { res = await fetch(ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal }); }
@@ -290,7 +299,7 @@ async function startApp(){
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     }
   }
-  $('#gate').hidden = true; $('#locked').hidden = true; $('#app').hidden = false; $('#topctl').hidden = false;
+  $('#gate').hidden = true; $('#locked').hidden = true; $('#app').hidden = false; $('#topctl').hidden = false; $('#navWrap').hidden = false;
   if (!persistOn) warn('This browser window cannot save records (private window?). Everything will be lost when you close it. Open the page in a normal window to keep your work.');
   paintTrial(); draw();
   if (REC.some(r => r.state === 'queued')) { toast('Some files were still waiting to be read. Press Retry on them.'); REC.filter(r => r.state === 'queued').forEach(r => { r.state = 'error'; r.error = 'Not read yet. Press Retry.'; }); draw(); }
@@ -484,11 +493,12 @@ const TABS = [['dashboard','Dashboard'],['upload','Add receipts'],['review','Rev
 function drawNav(){
   const pend = REC.filter(r => r.state === 'pending' && (!st.client || r.client === st.client)).length;
   const cur = TABS.find(t => t[0] === st.tab) || TABS[0], nb = $('#navBtn');
-  nb.innerHTML = `<span>${cur[1]}${pend && st.tab !== 'review' ? ` <span class="n" style="display:inline-block;min-width:18px;text-align:center;font-size:11px;border-radius:99px;padding:0 6px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line)">${pend}</span>` : ''}</span><span aria-hidden="true">${st.menu ? '\u25B2' : '\u25BC'}</span>`;
+  nb.innerHTML = `<span class="ic" aria-hidden="true"></span><span class="tx">${cur[1]}</span>${pend && st.tab !== 'review' ? `<span class="n" style="display:inline-block;min-width:18px;text-align:center;font-size:11px;border-radius:99px;padding:0 6px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line)">${pend} to check</span>` : ''}`;
   nb.setAttribute('aria-expanded', !!st.menu); $('#nav').classList.toggle('open', !!st.menu);
   $('#nav').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-t="${k}" aria-selected="${st.tab === k}">${k === 'upload' ? '<span class="lf">Add receipts</span><span class="ls">Add</span>' : k === 'sales' ? '<span class="lf">Sales (Z-Readings)</span><span class="ls">Sales</span>' : l}${k === 'review' && pend ? `<span class="n">${pend}</span>` : ''}</button>`).join('');
 }
-$('#navBtn').addEventListener('click', () => { st.menu = !st.menu; drawNav(); });
+$('#navBtn').addEventListener('click', e => { e.stopPropagation(); st.menu = !st.menu; drawNav(); });
+document.addEventListener('click', e => { if (st.menu && !e.target.closest('#nav')) { st.menu = false; drawNav(); } });
 $('#nav').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (b) { st.menu = false; st.tab = b.dataset.t; st.sel = null; st.f = {}; st.confirm = ''; draw(); } });
 function drawTop(){
   const t = $('#topctl'); if (t.contains(document.activeElement) && st.nameEdit === false && document.activeElement.tagName === 'SELECT') return;

@@ -33,6 +33,6 @@ Send the Netlify link and the trial code. The page locks with your contact detai
 ## Notes
 - The page reads photos and PDF scans (one receipt per page). It exports John's format: a PUR-VAT and a PUR-NONVAT sheet for each month found in the dates.
 - To restart a trial, change ACCESS_CODE to a new code. Each code has its own counter.
-- If reading fails with an upstream error, the Gemini model name may have changed. Set GEMINI_MODEL to the current Flash model name shown in AI Studio.
+- If reading fails with an upstream error, the Gemini model name may have changed. Set GEMINI_MODEL to the current Flash model name shown in AI Studio (Google retires old names, which causes a 404).
 - Free Netlify functions stop after about 10 seconds. If long receipts time out, tell Ray and the Function can move to a host without that limit.
 - Receipt photos are sent to an outside online service to be read. Tell the client this.

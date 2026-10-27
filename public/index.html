@@ -101,14 +101,18 @@
   .tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
   .tgrid .cell{padding:8px 10px;border:1px solid var(--line);border-radius:6px}.tgrid .cell span{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
   .tgrid .cell strong{font-family:var(--mono);font-size:18px;font-weight:500}.tgrid input{margin-top:3px;width:100%}
+  .ls{display:none}
   @media (max-width:640px){
+    .lf{display:none}.ls{display:inline}
     body{font-size:14px}
     .top{padding:12px 0 8px;gap:8px}.brand b{font-size:16px}.brand span.s{display:none}
     .ctl#topctl{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}
     #topctl label{display:none}#topctl #cli{grid-column:1 / -1;width:100%}#topctl select,#topctl .btn,#topctl input{width:100%;min-height:40px}
     #trialBar{font-size:12px;padding:6px 10px;margin-bottom:8px}
-    nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px 12px;padding:0 16px;-webkit-overflow-scrolling:touch}
-    nav::-webkit-scrollbar{display:none}nav button{white-space:nowrap;padding:10px 12px;flex:none}
+    nav{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:12px;border-bottom:0}
+    nav button{padding:9px 2px;font-size:13px;text-align:center;border:1px solid var(--line);border-radius:8px;margin:0;background:var(--surface);min-height:40px}
+    nav button[aria-selected=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+    nav .n{margin-left:3px;padding:0 5px}
     .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{padding:12px}
     .tile .l{font-size:11.5px}.tile b{font-size:18px;margin-top:2px}
     .photo{max-height:42vh}
@@ -475,7 +479,7 @@ const attention = r => r.state === 'pending' && checks(r).some(x => x[0] !== 'ok
 const TABS = [['dashboard','Dashboard'],['upload','Add receipts'],['review','Review'],['purchases','Purchases'],['sales','Sales (Z-Readings)'],['export','Export'],['activity','Activity'],['backup','Backup']];
 function drawNav(){
   const pend = REC.filter(r => r.state === 'pending' && (!st.client || r.client === st.client)).length;
-  $('#nav').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-t="${k}" aria-selected="${st.tab === k}">${l}${k === 'review' && pend ? `<span class="n">${pend}</span>` : ''}</button>`).join('');
+  $('#nav').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-t="${k}" aria-selected="${st.tab === k}">${k === 'upload' ? '<span class="lf">Add receipts</span><span class="ls">Add</span>' : k === 'sales' ? '<span class="lf">Sales (Z-Readings)</span><span class="ls">Sales</span>' : l}${k === 'review' && pend ? `<span class="n">${pend}</span>` : ''}</button>`).join('');
 }
 $('#nav').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (b) { st.tab = b.dataset.t; st.sel = null; st.f = {}; st.confirm = ''; draw(); } });
 function drawTop(){

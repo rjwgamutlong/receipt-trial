@@ -1,3 +1,11 @@
+# Free hybrid mode (OCR first, then a text-only AI step)
+
+1. Get a free key at ocr.space (Free OCR API, enter your email, the key arrives by email).
+2. Add it as OCR_SPACE_KEY next to your other settings and redeploy.
+3. The photo is now read as plain text by OCR.space, and only that text goes to the AI model (Gemini text, or any provider you set). If OCR fails, the app sends the photo to the AI model as before.
+4. Test with John's sample receipts first. Plain OCR is weaker than a vision model on faded, crumpled or handwritten receipts, so more fields will be yellow and need a manual fix.
+Remove OCR_SPACE_KEY to go back to photo-only reading.
+
 # Using a reader other than Gemini
 
 Set PROVIDER to `openai` and add three settings. This works with any OpenAI-compatible service that can read images:

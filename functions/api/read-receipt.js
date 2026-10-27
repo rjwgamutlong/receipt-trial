@@ -5,6 +5,7 @@
 //   ACCESS_CODE        required, the trial code you give the client, e.g. JADJ-TRIAL
 //   TRIAL_MAX          optional, receipts allowed in total (default 30)
 //   TRIAL_EXPIRES      optional, last day of the trial as YYYY-MM-DD (default: no expiry)
+//   OCR_SPACE_KEY      optional, free key from ocr.space. When set, photos are read as text first (hybrid mode) and only the text goes to the AI model
 //   PROVIDER           optional, "gemini" (default), "claude", or "openai" (any OpenAI-compatible service)
 //   OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL  for PROVIDER=openai, e.g. base https://api.mistral.ai/v1 or https://openrouter.ai/api/v1 or https://api.groq.com/openai/v1
 //   GEMINI_API_KEY     required when PROVIDER is gemini, free key from aistudio.google.com
@@ -84,6 +85,35 @@ Rules:
 
 const PROMPTS = { purchase: PROMPT_PURCHASE, sale: PROMPT_SALE };
 
+// Free "hybrid" mode: when OCR_SPACE_KEY is set, the photo is first turned into text by OCR.space
+// and only that text goes to the AI model. If OCR fails, the photos are sent to the model as before.
+async function readWithOcr(images, key, budgetMs) {
+  const out = [];
+  for (const b64 of images) {
+    const form = new FormData();
+    form.append("apikey", key);
+    form.append("base64Image", "data:image/jpeg;base64," + String(b64));
+    form.append("language", "eng");
+    form.append("OCREngine", "2");
+    form.append("scale", "true");
+    form.append("detectOrientation", "true");
+    const r = await fetch("https://api.ocr.space/parse/image", { method: "POST", body: form, signal: AbortSignal.timeout(budgetMs) });
+    if (!r.ok) throw new Error("ocr http " + r.status);
+    const j = await r.json();
+    if (j.IsErroredOnProcessing) throw new Error("ocr " + String(j.ErrorMessage || "error").slice(0, 120));
+    out.push(((j.ParsedResults || []).map((p) => p.ParsedText || "").join("\n")).trim());
+  }
+  return out.join("\n--- next part of the same document ---\n");
+}
+const TEXT_INTRO = (t) => `The receipt or Z-Reading was read by a text scanner (OCR), so there is no image, only the text below. The text can have mistakes (0 and O, 1 and I, 5 and S mixed up, dropped digits), lines out of order, and lines repeated where photo parts overlap. Read it as if it were the document, ignore repeats, and add any field whose digits look garbled to "uncertain".
+
+OCR TEXT:
+---
+${t}
+---
+
+`;
+
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
 
@@ -117,15 +147,23 @@ export async function onRequest({ request: req, env }) {
   if (total > 5_000_000) return json({ error: "too_big" }, 413);
 
   const provider = (env.PROVIDER || "gemini").toLowerCase();
+  let ocrText = "";
+  if (env.OCR_SPACE_KEY) {
+    try { ocrText = await readWithOcr(images, env.OCR_SPACE_KEY, 20000); }
+    catch (e) { console.error("OCR failed, sending photos instead", e); }
+  }
+  const useText = ocrText.replace(/---[^\n]*---/g, "").trim().length > 30;
+  const srcImages = useText ? [] : images;
+  const promptText = (useText ? TEXT_INTRO(ocrText) : "") + PROMPTS[body.kind === "sale" ? "sale" : "purchase"];
   let res;
   try {
     if (provider === "claude") {
       if (!env.ANTHROPIC_API_KEY) return json({ error: "server_setup" }, 500);
-      const content = images.map((b64) => ({
+      const content = srcImages.map((b64) => ({
         type: "image",
         source: { type: "base64", media_type: "image/jpeg", data: String(b64) }
       }));
-      content.push({ type: "text", text: PROMPTS[body.kind === "sale" ? "sale" : "purchase"] });
+      content.push({ type: "text", text: promptText });
       res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -143,8 +181,8 @@ export async function onRequest({ request: req, env }) {
       // Any OpenAI-compatible service: OpenAI, Mistral, Groq, OpenRouter, etc.
       if (!env.OPENAI_API_KEY || !env.OPENAI_MODEL) return json({ error: "server_setup", detail: "OPENAI_API_KEY and OPENAI_MODEL are required" }, 500);
       const base = (env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
-      const content = images.map((b64) => ({ type: "image_url", image_url: { url: "data:image/jpeg;base64," + String(b64) } }));
-      content.push({ type: "text", text: PROMPTS[body.kind === "sale" ? "sale" : "purchase"] });
+      const content = srcImages.map((b64) => ({ type: "image_url", image_url: { url: "data:image/jpeg;base64," + String(b64) } }));
+      content.push({ type: "text", text: promptText });
       res = await fetch(base + "/chat/completions", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: "Bearer " + env.OPENAI_API_KEY },
@@ -156,8 +194,8 @@ export async function onRequest({ request: req, env }) {
       const primary = env.GEMINI_MODEL || "gemini-3.8-flash";
       const fallback = env.GEMINI_FALLBACK_MODEL || "gemini-3.6-flash";
       const models = fallback && fallback !== primary ? [primary, fallback] : [primary];
-      const parts = images.map((b64) => ({ inline_data: { mime_type: "image/jpeg", data: String(b64) } }));
-      parts.push({ text: PROMPTS[body.kind === "sale" ? "sale" : "purchase"] });
+      const parts = srcImages.map((b64) => ({ inline_data: { mime_type: "image/jpeg", data: String(b64) } }));
+      parts.push({ text: promptText });
       // Google sometimes answers 503 "high demand" or 429 for one model while another is free,
       // so if the first model is overloaded the next one is tried straight away.
       const t0 = Date.now();
@@ -202,5 +240,5 @@ export async function onRequest({ request: req, env }) {
   try { data = JSON.parse(text.slice(a, b + 1)); } catch { return json({ error: "invalid_json" }, 502); }
 
   await store.set(key, String(used + 1));
-  return json({ ok: true, data, remaining: Math.max(0, max - used - 1), max, expires: info.expires });
+  return json({ ok: true, via: useText ? "ocr" : "image", data, remaining: Math.max(0, max - used - 1), max, expires: info.expires });
 }

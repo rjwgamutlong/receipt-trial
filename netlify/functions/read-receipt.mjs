@@ -3,7 +3,8 @@
 //   ACCESS_CODE        required, the trial code you give the client, e.g. JADJ-TRIAL
 //   TRIAL_MAX          optional, receipts allowed in total (default 30)
 //   TRIAL_EXPIRES      optional, last day of the trial as YYYY-MM-DD (default: no expiry)
-//   PROVIDER           optional, "gemini" (free key, default) or "claude"
+//   PROVIDER           optional, "gemini" (default), "claude", or "openai" (any OpenAI-compatible service)
+//   OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL  for PROVIDER=openai, e.g. base https://api.mistral.ai/v1 or https://openrouter.ai/api/v1 or https://api.groq.com/openai/v1
 //   GEMINI_API_KEY     required when PROVIDER is gemini, free key from aistudio.google.com
 //   GEMINI_FALLBACK_MODEL optional, default gemini-3.6-flash, tried when the main model is overloaded (503/429)
 //   GEMINI_MODEL       optional, default gemini-3.8-flash (Google retires old model names, so if reading fails with a 404, set this to the current Flash name shown in AI Studio)
@@ -137,6 +138,18 @@ export default async (req) => {
           messages: [{ role: "user", content }]
         })
       });
+    } else if (provider === "openai") {
+      // Any OpenAI-compatible service: OpenAI, Mistral, Groq, OpenRouter, etc.
+      if (!env.OPENAI_API_KEY || !env.OPENAI_MODEL) return json({ error: "server_setup", detail: "OPENAI_API_KEY and OPENAI_MODEL are required" }, 500);
+      const base = (env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+      const content = images.map((b64) => ({ type: "image_url", image_url: { url: "data:image/jpeg;base64," + String(b64) } }));
+      content.push({ type: "text", text: PROMPTS[body.kind === "sale" ? "sale" : "purchase"] });
+      res = await fetch(base + "/chat/completions", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer " + env.OPENAI_API_KEY },
+        signal: AbortSignal.timeout(9000),
+        body: JSON.stringify({ model: env.OPENAI_MODEL, temperature: 0, messages: [{ role: "user", content }] })
+      });
     } else {
       if (!env.GEMINI_API_KEY) return json({ error: "server_setup" }, 500);
       const primary = env.GEMINI_MODEL || "gemini-3.8-flash";
@@ -179,6 +192,8 @@ export default async (req) => {
   const out = await res.json();
   const text = provider === "claude"
     ? (out.content || []).map((c) => c.text || "").join("")
+    : provider === "openai"
+    ? String((out.choices && out.choices[0] && out.choices[0].message && out.choices[0].message.content) || "")
     : ((out.candidates && out.candidates[0] && out.candidates[0].content && out.candidates[0].content.parts) || [])
         .map((p) => p.text || "").join("");
   const a = text.indexOf("{"), b = text.lastIndexOf("}");

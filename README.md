@@ -1,3 +1,11 @@
+# Using a reader other than Gemini
+
+Set PROVIDER to `openai` and add three settings. This works with any OpenAI-compatible service that can read images:
+- OPENAI_API_KEY = the key from that service
+- OPENAI_MODEL = the model name from that service (it must accept images)
+- OPENAI_BASE_URL = for example https://api.mistral.ai/v1, https://openrouter.ai/api/v1, https://api.groq.com/openai/v1 (leave empty for OpenAI itself)
+Always test with John's sample receipts first: accuracy on TIN, OR numbers and Z-Readings differs a lot between models.
+
 # Deploy on Cloudflare Pages (free, no 10-second limit)
 
 Use this if Netlify credits run out. Same app, same repo.

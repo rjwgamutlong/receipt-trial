@@ -101,6 +101,25 @@
   .tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
   .tgrid .cell{padding:8px 10px;border:1px solid var(--line);border-radius:6px}.tgrid .cell span{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
   .tgrid .cell strong{font-family:var(--mono);font-size:18px;font-weight:500}.tgrid input{margin-top:3px;width:100%}
+  @media (max-width:640px){
+    body{font-size:14px}
+    .top{padding:12px 0 8px;gap:8px}.brand b{font-size:16px}.brand span.s{display:none}
+    .ctl#topctl{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    #topctl label{display:none}#topctl #cli{grid-column:1 / -1;width:100%}#topctl select,#topctl .btn,#topctl input{width:100%;min-height:40px}
+    #trialBar{font-size:12px;padding:6px 10px;margin-bottom:8px}
+    nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px 12px;padding:0 16px;-webkit-overflow-scrolling:touch}
+    nav::-webkit-scrollbar{display:none}nav button{white-space:nowrap;padding:10px 12px;flex:none}
+    .tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{padding:12px}
+    .tile .l{font-size:11.5px}.tile b{font-size:18px;margin-top:2px}
+    .photo{max-height:42vh}
+    .drop{padding:12px}.drop .h{min-width:0;flex-basis:100%}.drop .btn{flex:1 1 40%}
+    .qi{flex-wrap:wrap}.qi .t{flex-basis:calc(100% - 60px)}
+    .btn{min-height:40px}.btn.small{min-height:34px}
+    .fields input,.fields select{min-height:40px;font-size:16px}
+    select,input[type=search],input[type=text]{font-size:16px}
+    .bar input[type=search]{min-width:100%}
+    th,td{padding:7px 8px}
+  }
 </style>
 </head>
 <body>

@@ -122,7 +122,7 @@
 <div class="wrap">
   <header>
     <h1>Receipt to Excel <span class="badge">TRIAL</span></h1>
-    <p>Add photos or PDF scans of receipts. The system reads each one, you check what is marked in yellow, then export to your Excel format (VAT and NON-VAT sheets by month).</p>
+    <p>Add photos or PDF scans of receipts. The system reads each one, you check what is marked in yellow, then export to Excel: your monthly VAT and NON-VAT sheets, plus one ALL RECEIPTS sheet you can filter and search.</p>
   </header>
 
   <section id="gate">
@@ -556,7 +556,8 @@ function rowsFromReceipts(list){
   return list.filter(r => r.status === 'done').map(r => ({
     date: String(r.data.date || '').trim(), doc_no: String(r.data.doc_no || '').trim(), tin: String(r.data.tin || '').trim(),
     name: String(r.data.name || '').trim(), address: String(r.data.address || '').trim(),
-    total: num(r.data.total), vat_type: r.data.vat_type === 'NON-VAT' ? 'NON-VAT' : 'VAT'
+    total: num(r.data.total), vat_type: r.data.vat_type === 'NON-VAT' ? 'NON-VAT' : 'VAT',
+    doc_type: String(r.data.doc_type || '').trim(), source: r.name, checked: r.checked ? 'Yes' : 'No'
   }));
 }
 
@@ -572,6 +573,36 @@ function buildWorkbook(ExcelJSLib, rows, contact){
   }
   const keys = [...groups.keys()].sort();
   const names = new Set();
+
+  /* One master sheet with every receipt: filter by date, name or TIN, or search with Ctrl+F. */
+  const all = wb.addWorksheet('ALL RECEIPTS');
+  names.add('ALL RECEIPTS');
+  const allHeads = ['DATE','OR/SI/DR','TIN','REGISTERED NAME','ADDRESS','GROSS AMOUNT','VAT / NON-VAT','DOCUMENT TYPE','SOURCE FILE','CHECKED'];
+  allHeads.forEach((h, i) => {
+    const c = all.getCell(1, i + 1);
+    c.value = h; c.font = { name: 'Calibri', size: 12, bold: true };
+    c.alignment = { horizontal: 'center', vertical: 'middle' };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE7EFEA' } };
+  });
+  [12,16,17,41,36,16,14,18,30,10].forEach((w, i) => { all.getColumn(i + 1).width = w; });
+  const sorted = rows.slice().sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+  sorted.forEach((r, i) => {
+    const n = 2 + i, p = parseDate(r.date);
+    const dc = all.getCell(n, 1);
+    if (p) { dc.value = new Date(Date.UTC(p.y, p.mo - 1, p.d)); dc.numFmt = 'mm/dd/yyyy'; } else dc.value = r.date;
+    all.getCell(n, 2).value = r.doc_no;
+    all.getCell(n, 3).value = r.tin;
+    all.getCell(n, 4).value = r.name;
+    all.getCell(n, 5).value = r.address;
+    const g = all.getCell(n, 6); g.value = r.total; g.numFmt = '#,##0.00';
+    all.getCell(n, 7).value = r.vat_type;
+    all.getCell(n, 8).value = r.doc_type;
+    all.getCell(n, 9).value = r.source;
+    all.getCell(n, 10).value = r.checked;
+  });
+  all.views = [{ state: 'frozen', ySplit: 1 }];
+  all.autoFilter = { from: { row: 1, column: 1 }, to: { row: Math.max(2, sorted.length + 1), column: allHeads.length } };
+
   const sheetName = (base) => { let n = base.slice(0, 31), i = 2; while (names.has(n)) n = base.slice(0, 27) + ' ' + i++; names.add(n); return n; };
   const money = '_-* #,##0.00_-;\\-* #,##0.00_-;_-* "-"??_-;_-@';
 

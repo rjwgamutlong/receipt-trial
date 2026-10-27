@@ -5,6 +5,7 @@
 //   TRIAL_EXPIRES      optional, last day of the trial as YYYY-MM-DD (default: no expiry)
 //   PROVIDER           optional, "gemini" (free key, default) or "claude"
 //   GEMINI_API_KEY     required when PROVIDER is gemini, free key from aistudio.google.com
+//   GEMINI_FALLBACK_MODEL optional, default gemini-3.6-flash, tried when the main model is overloaded (503/429)
 //   GEMINI_MODEL       optional, default gemini-3.8-flash (Google retires old model names, so if reading fails with a 404, set this to the current Flash name shown in AI Studio)
 //   ANTHROPIC_API_KEY  required when PROVIDER is claude, key from console.anthropic.com
 //   MODEL              optional, Claude model, default claude-sonnet-5-5
@@ -138,17 +139,25 @@ export default async (req) => {
       });
     } else {
       if (!env.GEMINI_API_KEY) return json({ error: "server_setup" }, 500);
-      const model = env.GEMINI_MODEL || "gemini-3.8-flash";
+      const primary = env.GEMINI_MODEL || "gemini-3.8-flash";
+      const fallback = env.GEMINI_FALLBACK_MODEL || "gemini-3.6-flash";
+      const models = fallback && fallback !== primary ? [primary, fallback] : [primary];
       const parts = images.map((b64) => ({ inline_data: { mime_type: "image/jpeg", data: String(b64) } }));
       parts.push({ text: PROMPTS[body.kind === "sale" ? "sale" : "purchase"] });
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2000, thinkingConfig: /^gemini-2/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: "low" } }
-        })
-      });
+      // Google sometimes answers 503 "high demand" or 429 for one model while another is free,
+      // so if the first model is overloaded the next one is tried straight away.
+      for (const model of models) {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2000, thinkingConfig: /^gemini-2/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: "low" } }
+          })
+        });
+        if (res.ok || ![429, 500, 503, 504].includes(res.status)) break;
+        console.error("Model busy, trying next", model, res.status);
+      }
     }
   } catch (e) {
     console.error("Fetch failed", e);
@@ -158,7 +167,7 @@ export default async (req) => {
     let detail = "";
     try { const e = await res.json(); detail = (e.error && (e.error.message || e.error.status)) || ""; } catch {}
     console.error("Provider error", res.status, detail);
-    return json({ error: res.status === 429 ? "busy" : "upstream", detail: `${provider} ${res.status} ${String(detail).slice(0, 160)}`.trim() }, 502);
+    return json({ error: (res.status === 429 || res.status === 503) ? "busy" : "upstream", detail: `${provider} ${res.status} ${String(detail).slice(0, 160)}`.trim() }, 502);
   }
 
   const out = await res.json();

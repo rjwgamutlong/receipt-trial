@@ -288,7 +288,7 @@ const saveSign = () => dbPut('meta', SIGN, 'sign');
 /* ---------- trial gate ---------- */
 const ERR = {
   bad_code: 'That trial code is not correct.',
-  busy: 'The system is busy. Wait a moment, then press Retry.',
+  busy: 'The reading service is busy right now (this is on the provider side and usually clears in a minute). Press Retry.',
   upstream: 'Connection problem. Press Retry.',
   invalid_json: 'The answer was not in the expected format. Press Retry.',
   too_big: 'This photo is too large. Try a smaller photo.',
@@ -543,7 +543,15 @@ async function extract(r){
   try {
     let parts = PARTS.get(r.id);
     if (!parts) { const b = await getScan(r.id); const p = await prepare(await loadImg(b)); parts = p.parts; PARTS.set(r.id, parts); }
-    const out = await callApi({ code, images: parts, kind: r.kind }, ctl.signal);
+    let out;
+    for (let attempt = 0; ; attempt++) {
+      try { out = await callApi({ code, images: parts, kind: r.kind }, ctl.signal); break; }
+      catch (e) {
+        if ((e.code !== 'busy' && e.code !== 'upstream') || attempt >= 2 || st.stopped) throw e;
+        r.error = 'Reading service is busy. Trying again...'; draw();
+        await new Promise(res => setTimeout(res, 3000 * (attempt + 1)));
+      }
+    }
     if (!out.data || typeof out.data !== 'object') throw { code: 'invalid_json' };
     fillFromRead(r, out.data); r.state = 'pending'; PARTS.delete(r.id);
     trial.remaining = out.remaining; paintTrial();

@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Receipt to Excel (Trial)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4f5f1; --surface:#ffffff; --ink:#1b2724; --muted:#5b6a66; --line:#d8ddd5;
+    --accent:#1c6a56; --accent-ink:#ffffff;
+    --flag:#fff0a3; --flag-line:#d4b000;
+    --bad:#a8261f; --bad-bg:#fbe8e5; --ok:#1c6a56; --ok-bg:#e0f1e9;
+    --font-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --font-num:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#111816; --surface:#19221f; --ink:#e5ece9; --muted:#9bada8; --line:#2b3834;
+      --accent:#4fc3a3; --accent-ink:#082019;
+      --flag:#4b4310; --flag-line:#c7a800;
+      --bad:#ff9087; --bad-bg:#3b1b18; --ok:#72d6b7; --ok-bg:#15332a;
+      color-scheme:dark;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.45;
+    padding:22px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  }
+  /* Trial watermark, sits over everything and never blocks clicks */
+  body::before{
+    content:"TRIAL VERSION";position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:min(14vw,120px);font-weight:700;letter-spacing:.08em;color:var(--ink);opacity:.045;
+    transform:rotate(-24deg);pointer-events:none;z-index:50;white-space:nowrap;
+  }
+  .wrap{max-width:980px;margin:0 auto}
+  header h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+  header p{margin:4px 0 0;color:var(--muted);max-width:60ch}
+  .badge{display:inline-block;margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:99px;background:var(--flag);color:#3a3000;border:1px solid var(--flag-line);vertical-align:middle}
+  button{font:inherit;cursor:pointer}
+  .btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:9px 15px;font-weight:600}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .btn.small{padding:5px 10px;font-size:12px;font-weight:500}
+  .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  #gate,#locked{margin-top:18px;padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-width:520px}
+  #gate h2,#locked h2{margin:0 0 6px;font-size:17px}
+  #gate p,#locked p{margin:0 0 12px;color:var(--muted)}
+  #gate .row2{display:flex;gap:8px}
+  #gateErr{margin-top:8px;color:var(--bad);min-height:18px;font-size:13px}
+  #locked a{color:var(--accent);font-weight:600}
+
+  #trialBar{margin-top:14px;padding:8px 12px;border-radius:6px;background:var(--flag);color:#3a3000;border:1px solid var(--flag-line);font-size:13px}
+
+  #intake{margin-top:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:16px;border:1.5px dashed var(--line);border-radius:10px;background:var(--surface)}
+  #intake.over{border-color:var(--accent)}
+  #intake .hint{flex:1;min-width:200px;color:var(--muted)}
+  #msg{min-height:20px;margin-top:10px;color:var(--muted);font-size:13px}
+
+  #list{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+  .card{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .card .photo{align-self:start}
+  .card .photo img{width:100%;max-height:420px;object-fit:contain;border-radius:6px;background:var(--paper);border:1px solid var(--line);display:block}
+  .card .top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .card .top b{font-weight:600;overflow-wrap:anywhere;min-width:0}
+  .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--paper);color:var(--muted);border:1px solid var(--line)}
+  .tag.done{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+  .tag.error{background:var(--bad-bg);color:var(--bad);border-color:transparent}
+  .spacer{flex:1}
+  .fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+  .fields label,th{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  input[type=text]{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:5px;background:var(--paper);color:var(--ink);font:inherit}
+  input.num{font-family:var(--font-num);text-align:right}
+  input.warn{background:var(--flag);border-color:var(--flag-line);color:#2b2500}
+  .tablewrap{overflow-x:auto;margin-top:12px}
+  table{width:100%;border-collapse:collapse;min-width:420px}
+  th{text-align:left;padding:3px 4px}
+  td{padding:2px 3px}
+  td.n{width:96px} td.x{width:40px}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
+  .row label.check{display:flex;gap:6px;align-items:center;font-weight:500}
+  .check-badge{margin-top:10px;padding:8px 10px;border-radius:6px;font-size:13px}
+  .check-badge.ok{background:var(--ok-bg);color:var(--ok)}
+  .check-badge.bad{background:var(--bad-bg);color:var(--bad)}
+  .unsure{margin-top:8px;font-size:12px;color:var(--muted)}
+  .reading{display:flex;gap:10px;align-items:center;color:var(--muted)}
+  .dots{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion: reduce){.dots{animation:none}}
+
+  #time{margin-top:16px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+  #time h2{margin:0 0 4px;font-size:15px}
+  #time p{margin:0 0 10px;color:var(--muted);font-size:13px}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+  .tgrid .cell{padding:8px 10px;border:1px solid var(--line);border-radius:6px}
+  .tgrid .cell span{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .tgrid .cell strong{font-family:var(--font-num);font-size:18px;font-weight:500}
+  .tgrid input{margin-top:3px}
+
+  .barwrap{position:sticky;bottom:0;margin:18px calc(-1 * max(16px, env(safe-area-inset-left, 0px))) 0;padding:0 max(16px, env(safe-area-inset-left, 0px));background:var(--surface);border-top:1px solid var(--line);z-index:40}
+  #bar{max-width:980px;margin:0 auto;padding-block:12px calc(12px + env(safe-area-inset-bottom, 0px));display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+  #bar .stats{flex:1;min-width:200px;font-size:13px;color:var(--muted)}
+  #bar .stats b{color:var(--ink);font-family:var(--font-num);font-weight:500}
+
+  @media (max-width:700px){
+    .card{grid-template-columns:1fr}
+    .card .photo img{max-height:260px}
+    .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Receipt to Excel <span class="badge">TRIAL</span></h1>
+    <p>Add photos of receipts. The system reads each one, you check what is marked in yellow, then export the rows to Excel.</p>
+  </header>
+
+  <section id="gate">
+    <h2>Enter your trial code</h2>
+    <p>The trial code was sent to you by Blyss Digital.</p>
+    <div class="row2">
+      <input type="text" id="codeIn" placeholder="Trial code" autocomplete="off" aria-label="Trial code">
+      <button class="btn" id="codeBtn">Start</button>
+    </div>
+    <div id="gateErr" role="alert"></div>
+  </section>
+
+  <section id="locked" hidden>
+    <h2 id="lockTitle">Your trial has ended</h2>
+    <p id="lockText"></p>
+    <p>To continue, contact Blyss Digital:<br>
+      <a id="lockMail" href="#"></a><br>
+      <a id="lockPhone" href="#"></a></p>
+  </section>
+
+  <div id="app" hidden>
+    <div id="trialBar"></div>
+    <div id="intake">
+      <button class="btn" id="addBtn">Add receipt photos</button>
+      <button class="btn ghost" id="camBtn">Take a photo</button>
+      <span class="hint">Printed and handwritten receipts both work. One receipt per photo, flat and well lit.</span>
+      <input type="file" id="file" accept="image/*" multiple hidden>
+      <input type="file" id="cam" accept="image/*" capture="environment" hidden>
+      <button class="btn ghost" id="stopBtn" hidden>Stop</button>
+    </div>
+    <div id="msg" role="status" aria-live="polite"></div>
+    <div id="list"></div>
+
+    <section id="time" hidden>
+      <h2>Time saved</h2>
+      <p>These are example timings. Change them to match how long your office really takes.</p>
+      <div class="tgrid">
+        <div class="cell"><span>Typing one receipt by hand (min)</span><input type="text" class="num" id="tManual" value="3" inputmode="decimal"></div>
+        <div class="cell"><span>Checking one receipt here (min)</span><input type="text" class="num" id="tCheck" value="1" inputmode="decimal"></div>
+        <div class="cell"><span>By hand</span><strong id="tHand">0</strong></div>
+        <div class="cell"><span>With this page</span><strong id="tTool">0</strong></div>
+        <div class="cell"><span>Saved</span><strong id="tSaved">0</strong></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="barwrap" id="barwrap" hidden>
+  <div id="bar">
+    <div class="stats" id="stats">No receipts yet.</div>
+    <button class="btn ghost" id="copyBtn" disabled>Copy rows</button>
+    <button class="btn" id="expBtn" disabled>Export to Excel</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* ---- Edit these before you send the link ---- */
+const CONTACT = { name: 'Blyss Digital', email: 'rayann.catindig@gmail.com', phone: '+63 976 148 3535' };
+const ENDPOINT = '/.netlify/functions/read-receipt';
+/* --------------------------------------------- */
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const num = v => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/,/g,'')); return isNaN(n) ? null : n; };
+const get = id => receipts.find(r => r.id === id);
+
+const IMG_MAX = 3;
+let code = '', trial = { remaining: 0, max: 0, expires: null };
+let receipts = [], nextId = 1, running = false, ctl = null, stopped = false;
+
+const FIELDS = [
+  ['vendor','Vendor'],['tin','TIN'],['date','Date'],['receipt_no','Receipt no.'],
+  ['payment','Payment'],['subtotal','Subtotal'],['vat','VAT'],['total','Total']
+];
+const NUMERIC = new Set(['subtotal','vat','total']);
+const KEY = ['vendor','tin','date','receipt_no','total'];
+
+const ERR = {
+  bad_code: 'That trial code is not correct.',
+  busy: 'The system is busy. Wait a moment, then press Retry.',
+  upstream: 'Connection problem. Press Retry.',
+  invalid_json: 'The answer was not in the expected format. Press Retry.',
+  too_big: 'This photo is too large. Try a smaller photo.',
+  bad_images: 'This image could not be used. Try another photo (JPG or PNG).',
+  server_setup: 'The trial is not set up yet. Please contact Blyss Digital.'
+};
+
+function setMsg(t){ $('msg').textContent = t || ''; }
+
+/* ---------- trial gate ---------- */
+function showLocked(kind){
+  $('gate').hidden = true; $('app').hidden = true; $('barwrap').hidden = true; $('locked').hidden = false;
+  $('lockTitle').textContent = kind === 'limit' ? 'Trial receipts used up' : 'Your trial has ended';
+  $('lockText').textContent = kind === 'limit'
+    ? 'You have used all the receipts included in this trial. Your checked rows are not lost if you exported them already.'
+    : 'The trial period is over.';
+  $('lockMail').href = 'mailto:' + CONTACT.email; $('lockMail').textContent = CONTACT.email;
+  $('lockPhone').href = 'tel:' + CONTACT.phone.replace(/\s/g,''); $('lockPhone').textContent = CONTACT.phone;
+}
+
+function showApp(){
+  $('gate').hidden = true; $('locked').hidden = true; $('app').hidden = false; $('barwrap').hidden = false;
+  paintTrial();
+}
+
+function paintTrial(){
+  const d = trial.expires ? ' Trial ends ' + trial.expires + '.' : '';
+  $('trialBar').textContent = `Trial: ${trial.remaining} of ${trial.max} receipts left.${d}`;
+}
+
+async function callApi(payload, signal){
+  let res;
+  try { res = await fetch(ENDPOINT, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload), signal }); }
+  catch(e){ if (e.name === 'AbortError') throw { code:'cancelled' }; throw { code:'upstream' }; }
+  let data = {};
+  try { data = await res.json(); } catch(e){}
+  if (!res.ok) throw { code: data.error || 'upstream', info: data };
+  return data;
+}
+
+async function tryCode(c){
+  $('gateErr').textContent = '';
+  try {
+    const s = await callApi({ code: c, action: 'status' });
+    code = c; trial = s;
+    try { localStorage.setItem('trialCode', c); } catch(e){}
+    showApp();
+  } catch(e) {
+    if (e.code === 'expired' || e.code === 'limit') { showLocked(e.code); return; }
+    $('gateErr').textContent = ERR[e.code] || 'Could not check the code. Try again.';
+    try { localStorage.removeItem('trialCode'); } catch(_){}
+  }
+}
+
+$('codeBtn').onclick = () => { const v = $('codeIn').value.trim(); if (v) tryCode(v); };
+$('codeIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('codeBtn').click(); });
+(function boot(){
+  let saved = '';
+  try { saved = localStorage.getItem('trialCode') || ''; } catch(e){}
+  if (saved) tryCode(saved);
+})();
+
+/* ---------- photo intake ---------- */
+$('addBtn').onclick = () => $('file').click();
+$('camBtn').onclick = () => $('cam').click();
+$('file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('cam').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('stopBtn').onclick = () => { stopped = true; if (ctl) ctl.abort(); };
+const intake = $('intake');
+['dragenter','dragover'].forEach(ev => intake.addEventListener(ev, e => { e.preventDefault(); intake.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => intake.addEventListener(ev, e => { e.preventDefault(); intake.classList.remove('over'); }));
+intake.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+function loadImg(file){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not open this image. Try JPG or PNG.')); };
+    img.src = url;
+  });
+}
+
+function cut(img, sx, sy, sw, sh, scale, q){
+  return new Promise((res, rej) => {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(sw * scale)); c.height = Math.max(1, Math.round(sh * scale));
+    c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    c.toBlob(b => b ? res(b) : rej(new Error('Could not prepare this image.')), 'image/jpeg', q);
+  });
+}
+
+function toB64(blob){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).split(',')[1]);
+    fr.onerror = () => rej(new Error('Could not prepare this image.'));
+    fr.readAsDataURL(blob);
+  });
+}
+
+/* A tall, narrow receipt photo loses its small print when shrunk to one picture.
+   So it is cut into overlapping slices, each kept sharp, and read together. */
+async function prepare(file){
+  const img = await loadImg(file);
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const thumb = await cut(img, 0, 0, w, h, Math.min(1, 900 / Math.max(w, h)), 0.8);
+  if (h / w <= 1.6) {
+    const whole = await cut(img, 0, 0, w, h, Math.min(1, 1500 / Math.max(w, h)), 0.85);
+    return { thumb, parts: [await toB64(whole)] };
+  }
+  const needed = Math.ceil((h / (1.2 * w) - 0.1) / 0.9);
+  const n = Math.max(2, Math.min(IMG_MAX, needed));
+  const sliceH = h / (0.9 * n + 0.1);
+  const step = 0.9 * sliceH;
+  const sc = Math.min(1, 1300 / Math.max(w, sliceH));
+  const parts = [];
+  for (let i = 0; i < n; i++) {
+    const y = Math.max(0, Math.min(h - sliceH, Math.round(i * step)));
+    parts.push(await toB64(await cut(img, 0, y, w, sliceH, sc, 0.85)));
+  }
+  return { thumb, parts };
+}
+
+async function addFiles(files){
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    const r = { id: nextId++, name: f.name || 'photo', status: 'queued', data: null, error: '', checked: false, parts: null, url: '' };
+    try { const p = await prepare(f); r.parts = p.parts; r.url = URL.createObjectURL(p.thumb); }
+    catch(e){ r.status = 'error'; r.error = e.message; }
+    receipts.push(r);
+  }
+  render();
+  processQueue();
+}
+
+async function processQueue(){
+  if (running) return;
+  running = true; stopped = false;
+  $('stopBtn').hidden = false;
+  try {
+    while (!stopped) {
+      const r = receipts.find(x => x.status === 'queued');
+      if (!r) break;
+      await extract(r);
+    }
+  } finally {
+    running = false; $('stopBtn').hidden = true;
+    if (stopped) { receipts.forEach(r => { if (r.status === 'queued') { r.status = 'error'; r.error = 'Stopped. Press Retry to read it.'; } }); render(); }
+  }
+}
+
+async function extract(r){
+  r.status = 'reading'; r.error = ''; render();
+  const queued = receipts.filter(x => x.status === 'queued').length;
+  setMsg(queued ? `Reading ${r.name}. ${queued} more waiting.` : `Reading ${r.name}.`);
+  ctl = new AbortController();
+  try {
+    const out = await callApi({ code, images: r.parts }, ctl.signal);
+    const d = out.data;
+    if (!d || typeof d !== 'object') throw { code: 'invalid_json' };
+    d.items = Array.isArray(d.items) ? d.items : [];
+    d.uncertain = Array.isArray(d.uncertain) ? d.uncertain.map(String) : [];
+    r.data = d; r.status = 'done';
+    trial.remaining = out.remaining; paintTrial();
+  } catch(e) {
+    if (e.code === 'expired' || e.code === 'limit') { ctl = null; setMsg(''); showLocked(e.code); stopped = true; return; }
+    r.status = 'error';
+    r.error = e.code === 'cancelled' ? 'Stopped. Press Retry to read it.' : (ERR[e.code] || 'Something went wrong. Press Retry.');
+  }
+  ctl = null; setMsg(''); render();
+}
+
+/* ---------- checking and editing ---------- */
+function friendly(k){
+  const m = k.match(/^items\.(\d+)\.(\w+)$/);
+  if (m) return `item ${Number(m[1]) + 1} ${m[2].replace('_',' ')}`;
+  const f = FIELDS.find(x => x[0] === k);
+  if (k === 'multiple_receipts') return 'more than one receipt in the photo';
+  return f ? f[1].toLowerCase().replace(/\.$/, '') : k.replace('_',' ');
+}
+
+const blank = (r, k) => !String(r.data[k] ?? '').trim();
+const missing = r => KEY.filter(k => blank(r, k));
+const warn = (r, k) => (r.data.uncertain.includes(k) || (KEY.includes(k) && blank(r, k))) ? ' warn' : '';
+
+function check(r){
+  const sum = r.data.items.reduce((a, it) => a + (num(it.amount) || 0), 0);
+  const total = num(r.data.total);
+  if (total == null) return { ok:false, msg:'No total found. Please check.' };
+  if (!r.data.items.length) return { ok:false, msg:'No items found. Please check.' };
+  if (Math.abs(sum - total) > 0.01) return { ok:false, msg:`Items add up to ${sum.toFixed(2)} but the total is ${total.toFixed(2)}. Please check.` };
+  return { ok:true, msg:`Items add up to the total (${total.toFixed(2)}).` };
+}
+const needsAttention = r => r.status === 'done' && !r.checked && (r.data.uncertain.length > 0 || missing(r).length > 0 || !check(r).ok);
+
+function card(r){
+  let h = `<article class="card" id="c${r.id}"><div class="photo">${r.url ? `<img src="${r.url}" alt="Photo of ${esc(r.name)}">` : ''}</div><div>`;
+  h += `<div class="top"><b>${esc(r.name)}</b><span class="tag ${r.status === 'done' ? 'done' : r.status === 'error' ? 'error' : ''}">${r.status === 'done' ? 'Read' : r.status === 'error' ? 'Problem' : r.status === 'reading' ? 'Reading' : 'Waiting'}</span><span class="spacer"></span><button class="btn danger small" data-act="remove" data-id="${r.id}">Remove</button></div>`;
+  if (r.status === 'error') {
+    h += `<p style="color:var(--bad);margin:0 0 10px">${esc(r.error)}</p>` + (r.parts ? `<button class="btn small" data-act="retry" data-id="${r.id}">Retry</button>` : '');
+  } else if (r.status !== 'done') {
+    h += `<div class="reading"><span class="dots"></span>${r.status === 'reading' ? 'Reading this receipt...' : 'Waiting for its turn...'}</div>`;
+  } else {
+    const d = r.data;
+    h += `<div class="fields">`;
+    for (const [k, label] of FIELDS) {
+      h += `<div><label for="f${r.id}${k}">${label}</label><input type="text" id="f${r.id}${k}" class="${NUMERIC.has(k) ? 'num' : ''}${warn(r,k)}" data-id="${r.id}" data-k="${k}" value="${esc(d[k])}"></div>`;
+    }
+    h += `</div><div class="tablewrap"><table><tr><th>Description</th><th>Qty</th><th>Unit price</th><th>Amount</th><th></th></tr>`;
+    d.items.forEach((it, i) => {
+      h += `<tr><td><input type="text" class="${warn(r,'items.'+i+'.description').trim()}" aria-label="Item ${i+1} description" data-id="${r.id}" data-i="${i}" data-k="description" value="${esc(it.description)}"></td>`;
+      for (const k of ['qty','unit_price','amount']) {
+        h += `<td class="n"><input type="text" class="num${warn(r,'items.'+i+'.'+k)}" aria-label="Item ${i+1} ${k.replace('_',' ')}" data-id="${r.id}" data-i="${i}" data-k="${k}" value="${esc(it[k])}"></td>`;
+      }
+      h += `<td class="x"><button class="btn danger small" aria-label="Delete item ${i+1}" data-act="delrow" data-id="${r.id}" data-i="${i}">x</button></td></tr>`;
+    });
+    h += `</table></div>`;
+    h += `<div class="row"><button class="btn ghost small" data-act="addrow" data-id="${r.id}">Add item row</button>
+          <label class="check"><input type="checkbox" id="k${r.id}" data-act="check" data-id="${r.id}" ${r.checked ? 'checked' : ''}> I checked this receipt</label>
+          <span style="font-size:12px;color:var(--muted)">${esc(d.receipt_type || '')}${r.parts && r.parts.length > 1 ? ', read in ' + r.parts.length + ' slices' : ''}</span></div>`;
+    h += `<div class="check-badge" id="b${r.id}"></div><div class="unsure" id="u${r.id}"></div>`;
+  }
+  h += `</div></article>`;
+  return h;
+}
+
+function refreshCard(id){
+  const r = get(id);
+  if (!r || r.status !== 'done') return;
+  const b = $('b' + id), u = $('u' + id), k = $('k' + id);
+  if (b) { const c = check(r); b.className = 'check-badge ' + (c.ok ? 'ok' : 'bad'); b.textContent = c.msg; }
+  if (u) {
+    const bits = [];
+    if (r.data.uncertain.length) bits.push('The system was unsure about: ' + r.data.uncertain.map(friendly).join(', ') + '.');
+    const m = missing(r);
+    if (m.length) bits.push('Still empty: ' + m.map(friendly).join(', ') + '. Fill them in if they are on the receipt.');
+    u.textContent = bits.join(' ');
+  }
+  if (k) k.checked = r.checked;
+}
+
+function render(){
+  $('list').innerHTML = receipts.map(card).join('');
+  receipts.forEach(r => refreshCard(r.id));
+  stats();
+}
+
+function stats(){
+  const done = receipts.filter(r => r.status === 'done');
+  const checked = done.filter(r => r.checked).length;
+  const attn = receipts.filter(needsAttention).length;
+  const left = receipts.filter(r => r.status === 'queued' || r.status === 'reading').length;
+  $('stats').innerHTML = receipts.length
+    ? `<b>${done.length}</b> read, <b>${checked}</b> checked, <b>${attn}</b> need a look${left ? `, <b>${left}</b> still reading` : ''}.`
+    : 'No receipts yet.';
+  $('expBtn').disabled = !done.length; $('copyBtn').disabled = !done.length;
+  $('time').hidden = !done.length;
+  timeCalc(done.length);
+}
+
+function timeCalc(n){
+  const m = num($('tManual').value) || 0, c = num($('tCheck').value) || 0;
+  const hand = n * m, tool = n * c;
+  const fmt = x => x >= 60 ? `${Math.floor(x / 60)} h ${Math.round(x % 60)} min` : `${Math.round(x * 10) / 10} min`;
+  $('tHand').textContent = fmt(hand); $('tTool').textContent = fmt(tool); $('tSaved').textContent = fmt(Math.max(0, hand - tool));
+}
+$('tManual').oninput = $('tCheck').oninput = () => timeCalc(receipts.filter(r => r.status === 'done').length);
+
+const list = $('list');
+list.addEventListener('input', e => {
+  const t = e.target, id = Number(t.dataset.id), k = t.dataset.k;
+  if (!id || !k) return;
+  const r = get(id); if (!r || !r.data) return;
+  let key = k;
+  if (t.dataset.i !== undefined) { r.data.items[Number(t.dataset.i)][k] = t.value; key = 'items.' + t.dataset.i + '.' + k; }
+  else r.data[k] = t.value;
+  r.data.uncertain = r.data.uncertain.filter(x => x !== key);
+  t.classList.remove('warn');
+  r.checked = false;
+  refreshCard(id); stats();
+});
+list.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.act === 'check') { get(Number(t.dataset.id)).checked = t.checked; stats(); }
+});
+list.addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const id = Number(b.dataset.id), r = get(id), act = b.dataset.act;
+  if (act === 'remove') { if (r.url) URL.revokeObjectURL(r.url); receipts = receipts.filter(x => x.id !== id); render(); }
+  else if (act === 'retry') { r.status = 'queued'; r.error = ''; render(); processQueue(); }
+  else if (act === 'addrow') { r.data.items.push({ description:'', qty:null, unit_price:null, amount:null }); r.checked = false; render(); }
+  else if (act === 'delrow') { r.data.items.splice(Number(b.dataset.i), 1); r.data.uncertain = r.data.uncertain.filter(x => !x.startsWith('items.')); r.checked = false; render(); }
+});
+
+/* ---------- export ---------- */
+function buildRows(){
+  const rec = [], items = [];
+  for (const r of receipts.filter(x => x.status === 'done')) {
+    const d = r.data, c = check(r);
+    const sum = d.items.reduce((a, it) => a + (num(it.amount) || 0), 0);
+    rec.push({
+      'File': r.name, 'Checked': r.checked ? 'Yes' : 'No', 'Type': d.receipt_type || '', 'Vendor': d.vendor || '', 'TIN': d.tin || '',
+      'Date': d.date || '', 'Receipt No': d.receipt_no || '', 'Payment': d.payment || '',
+      'Subtotal': num(d.subtotal), 'VAT': num(d.vat), 'Total': num(d.total),
+      'Items Sum': Number(sum.toFixed(2)), 'Totals Match': c.ok ? 'Yes' : 'No'
+    });
+    for (const it of d.items) {
+      items.push({
+        'File': r.name, 'Receipt No': d.receipt_no || '', 'Date': d.date || '', 'Vendor': d.vendor || '', 'TIN': d.tin || '',
+        'Description': it.description || '', 'Qty': num(it.qty), 'Unit Price': num(it.unit_price), 'Amount': num(it.amount)
+      });
+    }
+  }
+  return { rec, items };
+}
+
+$('expBtn').onclick = () => {
+  if (!window.XLSX) { setMsg('The Excel library did not load. Use Copy rows instead.'); return; }
+  const { rec, items } = buildRows();
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rec), 'Receipts');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(items), 'Line Items');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['TRIAL VERSION'],
+    ['This file was made with a trial of Receipt to Excel by ' + CONTACT.name + '.'],
+    ['Contact: ' + CONTACT.email + ' / ' + CONTACT.phone]
+  ]), 'Trial');
+  XLSX.writeFile(wb, 'TRIAL_receipts_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  setMsg('Saved to your Downloads folder.');
+};
+
+$('copyBtn').onclick = async () => {
+  const { rec } = buildRows();
+  if (!rec.length) return;
+  const cols = Object.keys(rec[0]);
+  const tsv = [cols.join('\t'), ...rec.map(r => cols.map(c => String(r[c] ?? '').replace(/[\t\n]/g, ' ')).join('\t'))].join('\n');
+  try { await navigator.clipboard.writeText(tsv); setMsg('Copied. Paste into Excel or Google Sheets.'); }
+  catch(e) { setMsg('Copy was blocked here. Use Export to Excel instead.'); }
+};
+</script>
+</body>
+</html>

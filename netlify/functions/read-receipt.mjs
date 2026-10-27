@@ -21,6 +21,8 @@ Schema:
   "tin": string or null,
   "name": string or null,
   "address": string or null,
+  "buyer_name": string or null,
+  "buyer_tin": string or null,
   "total": number or null,
   "vat_type": "VAT" or "NON-VAT" or null,
   "doc_type": string or null,
@@ -31,6 +33,7 @@ Schema:
 Rules:
 - name: the seller's business name as printed at the top. If a proprietor is shown (for example "Juan Cruz - Prop."), add it in brackets after the business name. Never use the buyer ("Sold to", "Delivered to", "Received from", "Cust Name") and never use the printer of the booklet.
 - address: the seller's address from the header, not the buyer's address and not the printer's.
+- buyer_name and buyer_tin: the customer the document is made out to ("Sold to", "Customer", "Registered to", "Cust Name", "Received from") and the customer's TIN, exactly as printed. Use null when the document shows none, and never put the seller's own details here. If only a name is shown, buyer_tin is null.
 - tin: the seller's TIN from the header, exactly as printed, for example "009-779-469-000". Ignore the TIN of the printer ("printing", "printers", "BIR Authority to Print" lines at the bottom) and the buyer's TIN.
 - vat_type: "VAT" if the header says "VAT Reg" or "VAT Registered". "NON-VAT" if it says "NON-VAT Reg", "NON VAT" or similar for the seller. Otherwise null.
 - doc_no: the document number: the Sales Invoice, Cash Sales Invoice, Order Slip, Delivery Receipt, Collection Receipt or OR number. For booklet documents this is the red or printed serial "No." (for example "1078991"). For POS receipts it is the invoice number (for example "04-00004161"), not the transaction, terminal, MIN or serial number.

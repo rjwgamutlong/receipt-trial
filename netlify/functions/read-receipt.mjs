@@ -1,35 +1,44 @@
 // Reads one receipt with Claude. The API key and the trial rules live here, never in the page.
 // Environment variables (set in Netlify > Site configuration > Environment variables):
-//   ANTHROPIC_API_KEY  required, your key from console.anthropic.com
 //   ACCESS_CODE        required, the trial code you give the client, e.g. JADJ-TRIAL
 //   TRIAL_MAX          optional, receipts allowed in total (default 30)
 //   TRIAL_EXPIRES      optional, last day of the trial as YYYY-MM-DD (default: no expiry)
-//   MODEL              optional, default claude-sonnet-5-5
+//   PROVIDER           optional, "gemini" (free key, default) or "claude"
+//   GEMINI_API_KEY     required when PROVIDER is gemini, free key from aistudio.google.com
+//   GEMINI_MODEL       optional, default gemini-2.5-flash (use the current Flash model name shown in AI Studio)
+//   ANTHROPIC_API_KEY  required when PROVIDER is claude, key from console.anthropic.com
+//   MODEL              optional, Claude model, default claude-sonnet-5-5
 import { getStore } from "@netlify/blobs";
 
-const PROMPT = `The attached image or images show ONE receipt from the Philippines. It may be a printed POS receipt, a printed official receipt, or a handwritten one. If several images are attached, they are overlapping slices of the same long receipt, in order from top to bottom: read them as one receipt and do not count an item twice where the slices overlap. The business name, TIN and receipt or invoice number are usually in the first slice, and the totals in the last. Read it and reply with ONLY one JSON object, no other text.
+const PROMPT = `The attached image or images show ONE receipt or invoice from the Philippines. It may be a printed POS receipt, a printed or booklet-style sales invoice, cash sales invoice, order slip, delivery receipt or collection receipt, and it may be handwritten. If several images are attached, they are overlapping slices of the same long receipt, in order from top to bottom: read them as one document.
+
+An accounting office needs these details about the SELLER (the business that issued the document), taken from the header at the top. Reply with ONLY one JSON object, no other text.
 
 Schema:
 {
-  "receipt_type": "printed" or "handwritten",
-  "vendor": string or null,
-  "tin": string or null,
   "date": "YYYY-MM-DD" or null,
-  "receipt_no": string or null,
-  "payment": string or null,
-  "subtotal": number or null,
-  "vat": number or null,
+  "doc_no": string or null,
+  "tin": string or null,
+  "name": string or null,
+  "address": string or null,
   "total": number or null,
-  "items": [ { "description": string, "qty": number or null, "unit_price": number or null, "amount": number or null } ],
+  "vat_type": "VAT" or "NON-VAT" or null,
+  "doc_type": string or null,
+  "not_valid_for_input_tax": true or false,
   "uncertain": [ names of fields you are not sure about ]
 }
 
 Rules:
-- Numbers are plain numbers: no currency symbol, no thousands commas.
+- name: the seller's business name as printed at the top. If a proprietor is shown (for example "Juan Cruz - Prop."), add it in brackets after the business name. Never use the buyer ("Sold to", "Delivered to", "Received from", "Cust Name") and never use the printer of the booklet.
+- address: the seller's address from the header, not the buyer's address and not the printer's.
+- tin: the seller's TIN from the header, exactly as printed, for example "009-779-469-000". Ignore the TIN of the printer ("printing", "printers", "BIR Authority to Print" lines at the bottom) and the buyer's TIN.
+- vat_type: "VAT" if the header says "VAT Reg" or "VAT Registered". "NON-VAT" if it says "NON-VAT Reg", "NON VAT" or similar for the seller. Otherwise null.
+- doc_no: the document number: the Sales Invoice, Cash Sales Invoice, Order Slip, Delivery Receipt, Collection Receipt or OR number. For booklet documents this is the red or printed serial "No." (for example "1078991"). For POS receipts it is the invoice number (for example "04-00004161"), not the transaction, terminal, MIN or serial number.
+- doc_type: for example "Sales Invoice", "Cash Sales Invoice", "Order Slip", "Delivery Receipt", "Collection Receipt", "Official Receipt".
+- total: the gross total amount due or total paid, VAT inclusive, as a plain number with no currency symbol and no commas. Not the cash given, not the change, not the VAT amount.
+- date: the date of the transaction as YYYY-MM-DD. Philippine dates are usually month first (MM/DD/YYYY or M-D-YY). A two digit year such as 26 means 2026. If the day and month could be swapped (both 12 or less) or the handwriting is unclear, add "date" to "uncertain".
+- not_valid_for_input_tax: true only if the document says it is not valid for claiming input tax, otherwise false.
 - Never guess. If something is unreadable, use null and add its name to "uncertain".
-- Item fields in "uncertain" use the form "items.0.amount" or "items.2.description" (zero based).
-- Top level fields use their own name, for example "date" or "total".
-- Keep item descriptions as written on the receipt.
 - If an image holds more than one separate receipt, read only the first and add "multiple_receipts" to "uncertain".`;
 
 const json = (obj, status = 200) =>
@@ -64,36 +73,59 @@ export default async (req) => {
   const total = images.reduce((a, s) => a + String(s).length, 0);
   if (total > 5_000_000) return json({ error: "too_big" }, 413);
 
-  if (!env.ANTHROPIC_API_KEY) return json({ error: "server_setup" }, 500);
-
-  const content = images.map((b64) => ({
-    type: "image",
-    source: { type: "base64", media_type: "image/jpeg", data: String(b64) }
-  }));
-  content.push({ type: "text", text: PROMPT });
-
+  const provider = (env.PROVIDER || "gemini").toLowerCase();
   let res;
   try {
-    res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: env.MODEL || "claude-sonnet-5-5",
-        max_tokens: 2000,
-        messages: [{ role: "user", content }]
-      })
-    });
-  } catch {
-    return json({ error: "upstream" }, 502);
+    if (provider === "claude") {
+      if (!env.ANTHROPIC_API_KEY) return json({ error: "server_setup" }, 500);
+      const content = images.map((b64) => ({
+        type: "image",
+        source: { type: "base64", media_type: "image/jpeg", data: String(b64) }
+      }));
+      content.push({ type: "text", text: PROMPT });
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: env.MODEL || "claude-sonnet-5-5",
+          max_tokens: 2000,
+          messages: [{ role: "user", content }]
+        })
+      });
+    } else {
+      if (!env.GEMINI_API_KEY) return json({ error: "server_setup" }, 500);
+      const model = env.GEMINI_MODEL || "gemini-2.5-flash";
+      const parts = images.map((b64) => ({ inline_data: { mime_type: "image/jpeg", data: String(b64) } }));
+      parts.push({ text: PROMPT });
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } }
+        })
+      });
+    }
+  } catch (e) {
+    console.error("Fetch failed", e);
+    return json({ error: "upstream", detail: "could not reach " + provider }, 502);
   }
-  if (!res.ok) return json({ error: res.status === 429 ? "busy" : "upstream" }, 502);
+  if (!res.ok) {
+    let detail = "";
+    try { const e = await res.json(); detail = (e.error && (e.error.message || e.error.status)) || ""; } catch {}
+    console.error("Provider error", res.status, detail);
+    return json({ error: res.status === 429 ? "busy" : "upstream", detail: `${provider} ${res.status} ${String(detail).slice(0, 160)}`.trim() }, 502);
+  }
 
   const out = await res.json();
-  const text = (out.content || []).map((c) => c.text || "").join("");
+  const text = provider === "claude"
+    ? (out.content || []).map((c) => c.text || "").join("")
+    : ((out.candidates && out.candidates[0] && out.candidates[0].content && out.candidates[0].content.parts) || [])
+        .map((p) => p.text || "").join("");
   const a = text.indexOf("{"), b = text.lastIndexOf("}");
   let data;
   try { data = JSON.parse(text.slice(a, b + 1)); } catch { return json({ error: "invalid_json" }, 502); }

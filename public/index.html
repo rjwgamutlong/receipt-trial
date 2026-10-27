@@ -39,6 +39,7 @@
   .btn:disabled{opacity:.45;cursor:default}
   .badge{display:inline-block;margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:99px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line);vertical-align:middle}
   .top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:16px 0 12px}
+  .brand{display:flex;gap:12px;align-items:center}.brand .logo{width:44px;height:44px;border-radius:8px;flex:none;object-fit:contain}
   .brand b{font-size:18px;letter-spacing:-.01em}.brand span.s{display:block;color:var(--muted);font-size:12px}
   .ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ctl label{color:var(--muted);font-size:12px}
   #trialBar{margin-bottom:12px;padding:8px 12px;border-radius:6px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line);font-size:13px}
@@ -93,7 +94,7 @@
   .log div{display:grid;grid-template-columns:9.5rem 8rem minmax(0,1fr);gap:10px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px}.log .t,.log .u{color:var(--muted)}
   @media (max-width:640px){.log div{grid-template-columns:1fr}}
   .dl{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;font-size:12.5px}.dl dt{color:var(--muted)}.dl dd{margin:0;overflow-wrap:anywhere}
-  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;max-width:calc(100% - 32px);z-index:60;font-size:13px}
+  .toast{z-index:80;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;max-width:calc(100% - 32px);font-size:13px}
   .toast[hidden],[hidden]{display:none!important}
   #gate,#locked{margin-top:22px;padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-width:520px}
   #gate h2,#locked h2{font-size:17px;margin:0 0 6px}#gate p,#locked p{margin:0 0 12px;color:var(--muted)}
@@ -110,13 +111,33 @@
   .tgrid .cell{padding:8px 10px;border:1px solid var(--line);border-radius:6px}.tgrid .cell span{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
   .tgrid .cell strong{font-family:var(--mono);font-size:18px;font-weight:500}.tgrid input{margin-top:3px;width:100%}
   .ls{display:none}
+  .onlym{display:none}
   #navBtn{display:none}
   .ts{display:none}
   @media (max-width:640px){
     body{font-size:14px}
-    .top{padding:12px 0 8px;gap:8px}.brand b{font-size:16px}.brand span.s{display:none}
     .ctl#topctl{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px}
     #topctl label{display:none}#topctl #cli{grid-column:1 / -1;width:100%}#topctl select,#topctl .btn,#topctl input{width:100%;min-height:40px}
+    .top{display:contents}
+    .brand{order:-2;padding:12px 0 8px}.brand .logo{width:38px;height:38px}.brand b{font-size:16px}.brand span.s{display:none}
+    .wrap>#topctl{order:0;margin-bottom:8px}
+    .ctl#topctl{grid-template-columns:1fr 1fr}
+    #topctl #cli{grid-column:auto}#topctl #usr{display:none}#topctl #nm{grid-column:1 / -1}#topctl #nmSave{grid-column:1 / -1}
+    nav .onlym{display:flex;color:var(--muted);font-weight:500}
+    .tw{overflow:visible;max-height:none;border:0;background:transparent;border-radius:0}
+    .tw table,.tw tbody{display:block;width:100%}.tw thead{display:none}
+    .tw tr{display:block;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px}
+    .tw tr.sel{border-color:var(--accent);background:var(--accent-soft)}
+    .tw td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:3px 0;border:0;white-space:normal;text-align:right;overflow-wrap:anywhere}
+    .tw td::before{content:attr(data-l);color:var(--muted);font-size:12px;text-align:left;flex:none}
+    .tw td.ttl{font-weight:600;text-align:left;padding-bottom:5px}.tw td.ttl::before{content:none}
+    .tw td.hm{display:none}.tw td.empty{display:block;text-align:center}.tw td.empty::before{content:none}
+    .nom{display:none}
+    .detail{position:fixed;inset:0;z-index:70;overflow:auto;border-radius:0;border:0;padding:0 16px 30px;background:var(--surface)}
+    .detail>.bar:first-child{position:sticky;top:0;background:var(--surface);padding:10px 0;margin:0 0 6px;z-index:1;border-bottom:1px solid var(--line)}
+    .detail .photo{max-height:none}
+    .bar select{flex:1 1 100%}
+    .fields.one{grid-template-columns:1fr}.fields.one .w{grid-column:auto}
     #trialBar{font-size:12px;padding:6px 10px;margin-bottom:8px}
     .wrap>#navWrap{order:-1}
     #navWrap{position:sticky;top:0;z-index:45;background:var(--bg);margin:0 -16px 10px;padding:6px 16px;border-bottom:1px solid var(--line)}
@@ -149,7 +170,7 @@
   <div id="navWrap" hidden><button id="navBtn" aria-expanded="false" aria-controls="nav" aria-label="Menu"></button>
     <nav role="tablist" aria-label="Sections" id="nav"></nav></div>
   <div class="top">
-    <div class="brand"><b>Receipt to Excel <span class="badge">TRIAL</span></b><span class="s">Receipts and Z-Readings into your own Excel formats, filed by client</span></div>
+    <div class="brand"><img class="logo" src="jadj-logo.png" alt="JADJ Business Solutions Inc." width="44" height="44"><div><b>Receipt to Excel <span class="badge">TRIAL</span></b><span class="s">JADJ Business Solutions Inc. · receipts and Z-Readings into your own Excel formats</span></div></div>
     <div class="ctl" id="topctl" hidden></div>
   </div>
 
@@ -634,11 +655,11 @@ function drawNav(){
   const cur = TABS.find(t => t[0] === st.tab) || TABS[0], nb = $('#navBtn');
   nb.innerHTML = `<span class="ic" aria-hidden="true"></span><span class="tx">${cur[1]}</span>${pend && st.tab !== 'review' ? `<span class="n" style="display:inline-block;min-width:18px;text-align:center;font-size:11px;border-radius:99px;padding:0 6px;background:var(--flag);color:var(--flag-ink);border:1px solid var(--flag-line)">${pend} to check</span>` : ''}`;
   nb.setAttribute('aria-expanded', !!st.menu); $('#nav').classList.toggle('open', !!st.menu);
-  $('#nav').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-t="${k}" aria-selected="${st.tab === k}">${k === 'upload' ? '<span class="lf">Add receipts</span><span class="ls">Add</span>' : k === 'sales' ? '<span class="lf">Sales (Z-Readings)</span><span class="ls">Sales</span>' : l}${k === 'review' && pend ? `<span class="n">${pend}</span>` : ''}</button>`).join('');
+  $('#nav').innerHTML = TABS.map(([k, l]) => `<button role="tab" data-t="${k}" aria-selected="${st.tab === k}">${k === 'upload' ? '<span class="lf">Add receipts</span><span class="ls">Add</span>' : k === 'sales' ? '<span class="lf">Sales (Z-Readings)</span><span class="ls">Sales</span>' : l}${k === 'review' && pend ? `<span class="n">${pend}</span>` : ''}</button>`).join('') + `<button data-name class="onlym">Signed in: ${esc(USER)} (change)</button>`;
 }
 $('#navBtn').addEventListener('click', e => { e.stopPropagation(); st.menu = !st.menu; drawNav(); });
 document.addEventListener('click', e => { if (st.menu && !e.target.closest('#nav')) { st.menu = false; drawNav(); } });
-$('#nav').addEventListener('click', e => { const b = e.target.closest('button[data-t]'); if (b) { st.menu = false; st.tab = b.dataset.t; st.sel = null; st.f = {}; st.confirm = ''; draw(); } });
+$('#nav').addEventListener('click', e => { if (e.target.closest('[data-name]')) { st.menu = false; st.nameEdit = true; draw(); const n = $('#nm'); if (n) { n.focus(); n.scrollIntoView({ block: 'center' }); } return; } const b = e.target.closest('button[data-t]'); if (b) { st.menu = false; st.tab = b.dataset.t; st.sel = null; st.f = {}; st.confirm = ''; draw(); } });
 function drawTop(){
   const t = $('#topctl'); if (t.contains(document.activeElement) && st.nameEdit === false && document.activeElement.tagName === 'SELECT') return;
   t.innerHTML = `<label for="cli">Client</label><select id="cli"><option value="">All clients</option>${CL.map(c => `<option value="${c.id}" ${st.client === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
@@ -673,7 +694,7 @@ function byMonth(cid){
   return Object.keys(m).sort().map(k => m[k]);
 }
 function chartSvg(rows, showSales){
-  const W = 520, H = 230, L = 52, B = 26, T = 10, R = 8, max = Math.max(1, ...rows.map(r => Math.max(r.sales, r.pur))) * 1.1;
+  const mob = window.innerWidth < 640, W = mob ? 340 : 520, H = mob ? 220 : 230, L = mob ? 58 : 52, B = 26, T = 10, R = 8, max = Math.max(1, ...rows.map(r => Math.max(r.sales, r.pur))) * 1.1;
   const y = v => H - B - (H - B - T) * v / max, bw = (W - L - R) / rows.length; let s = '';
   for (let i = 0; i <= 4; i++) { const v = max * i / 4; s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${compact(v)}</text>`; }
   rows.forEach((r, i) => { const x = L + i * bw + bw * .14, w = bw * (showSales ? .34 : .6);
@@ -684,11 +705,11 @@ function chartSvg(rows, showSales){
 function clientForm(c){
   const e = c || {};
   return `<div class="card" style="margin-top:12px"><h2>${c ? 'Edit client' : 'Add a client'}</h2><p class="note">Once saved, the client shows in the list and in the client choice when adding receipts.</p>
-  <div class="fields" style="margin-top:12px;max-width:44rem"><div class="w"><label for="nc-name">Business name</label><input type="text" id="nc-name" value="${esc(e.name || '')}" placeholder="Registered name as on the BIR certificate"></div>
+  <div class="fields one" style="margin-top:12px;max-width:44rem"><div class="w"><label for="nc-name">Business name</label><input type="text" id="nc-name" value="${esc(e.name || '')}" placeholder="Registered name as on the BIR certificate"></div>
   <div><label for="nc-tin">TIN with branch code</label><input type="text" id="nc-tin" value="${esc(e.tin || '')}" placeholder="000-000-000-000"></div>
   <div><label for="nc-vat">Registration</label><select id="nc-vat"><option ${e.vat === 'VAT' ? 'selected' : ''}>VAT</option><option ${e.vat === 'NON-VAT' ? 'selected' : ''}>NON-VAT</option></select></div>
   <div><label for="nc-who">Assigned to</label><input type="text" id="nc-who" value="${esc(e.who || '')}" placeholder="Staff name"></div>
-  <div><label for="nc-reg">Cash register</label><select id="nc-reg"><option value="yes" ${e.sales !== false ? 'selected' : ''}>Has a register (Z-Readings)</option><option value="no" ${e.sales === false ? 'selected' : ''}>No register</option></select></div>
+  <div><label for="nc-reg">Cash register</label><select id="nc-reg"><option value="yes" ${e.sales !== false ? 'selected' : ''}>Has a register</option><option value="no" ${e.sales === false ? 'selected' : ''}>No register</option></select></div>
   <div><label for="nc-due">Internal deadline (day of month)</label><input type="text" id="nc-due" value="${esc(e.due || '')}" placeholder="e.g. 5" inputmode="numeric"></div></div>
   <div class="bar"><button class="btn" id="saveClient">Save client</button><button class="btn ghost" id="cancelClient">Cancel</button></div></div>`;
 }
@@ -708,7 +729,7 @@ function vFirm(){
   ${st.editing === 'new' ? clientForm() : ''}
   <div class="card" style="margin-top:12px"><div class="bar" style="margin:0;justify-content:space-between"><h2>Clients for ${ml(curMonth())}</h2><button class="btn" data-add>Add client</button></div><p class="note">Where each client stands this month. Click a client to open its records.</p>
    <div class="tw" style="margin-top:10px"><table><thead><tr><th>Client</th><th>TIN</th><th class="n">Receipts</th><th class="n">Z-Readings</th><th class="n">To check</th><th>Assigned</th><th>Internal deadline</th><th>Status</th></tr></thead><tbody>
-   ${rows.map(({ c, s }) => `<tr data-client="${c.id}"><td><b>${esc(c.name)}</b></td><td class="mono">${esc(c.tin)}</td><td class="n">${s.p}</td><td class="n">${c.sales ? s.s : 'n/a'}</td><td class="n">${s.rev}</td><td>${esc(c.who || '')}</td><td>${c.due ? 'by the ' + esc(c.due) + 'th' : ''}</td><td><span class="stat ${s.cls}">${s.label}</span></td></tr>`).join('')}</tbody></table></div></div>
+   ${rows.map(({ c, s }) => `<tr data-client="${c.id}"><td class="ttl"><b>${esc(c.name)}</b></td><td class="mono hm" data-l="TIN">${esc(c.tin)}</td><td class="n" data-l="Receipts">${s.p}</td><td class="n" data-l="Z-Readings">${c.sales ? s.s : 'n/a'}</td><td class="n" data-l="To check">${s.rev}</td><td class="hm" data-l="Assigned">${esc(c.who || '')}</td><td class="hm" data-l="Internal deadline">${c.due ? 'by the ' + esc(c.due) + 'th' : ''}</td><td data-l="Status"><span class="stat ${s.cls}">${s.label}</span></td></tr>`).join('')}</tbody></table></div></div>
   <div class="card" style="margin-top:12px"><h2>Recent activity</h2><div class="log" style="margin-top:6px">${LOG.slice(0, 4).map(l => `<div><span class="t">${l.t}</span><span class="u">${esc(l.who)}</span><span>${esc(cname(l.client))}: ${esc(l.act)}</span></div>`).join('') || '<div class="empty">Nothing yet.</div>'}</div></div>
   <div class="card" style="margin-top:12px"><h2>Time saved</h2><p class="note">Example timings for ${approvedNow} approved record${approvedNow === 1 ? '' : 's'} in ${ml(curMonth())}. Change them to match your office.</p>
    <div class="tgrid"><div class="cell"><span>Typing one by hand (min)</span><input type="text" id="tManual" value="${esc(st.tManual)}" inputmode="decimal"></div><div class="cell"><span>Checking one here (min)</span><input type="text" id="tCheck" value="${esc(st.tCheck)}" inputmode="decimal"></div>
@@ -733,7 +754,7 @@ function vClient(){
   ${sign}
   <div class="grid2"><div class="card"><h2>${c.sales ? 'Sales and purchases by month' : 'Purchases by month'}</h2><p class="note">Gross amounts in pesos.</p><div class="legend">${c.sales ? '<span><i class="sw" style="background:var(--accent)"></i>Sales</span>' : ''}<span><i class="sw" style="background:var(--amber)"></i>Purchases</span></div>${bm.length ? chartSvg(bm, c.sales) : '<p class="note" style="padding:40px 0;text-align:center">Nothing approved yet.</p>'}</div>
   <div class="card"><h2>VAT summary</h2><p class="note">${c.vat === 'VAT' ? 'Output VAT less input tax on VAT purchases. An estimate to help the return, not the return itself.' : 'This client is NON-VAT, so there is no VAT summary. Purchases go on the NON-VAT sheet.'}</p>
-  ${c.vat === 'VAT' && bm.length ? `<div class="tw" style="margin-top:10px"><table><thead><tr><th>Month</th><th class="n">Output VAT</th><th class="n">Input tax</th><th class="n">Net VAT</th></tr></thead><tbody>${bm.map(r => `<tr style="cursor:default"><td>${ml(r.m)}</td><td class="n">${peso(r.ov)}</td><td class="n">${peso(r.iv)}</td><td class="n">${peso(r.ov - r.iv)}</td></tr>`).join('')}</tbody></table></div>` : ''}</div></div>`;
+  ${c.vat === 'VAT' && bm.length ? `<div class="tw" style="margin-top:10px"><table><thead><tr><th>Month</th><th class="n">Output VAT</th><th class="n">Input tax</th><th class="n">Net VAT</th></tr></thead><tbody>${bm.map(r => `<tr style="cursor:default"><td data-l="Month">${ml(r.m)}</td><td class="n" data-l="Output VAT">${peso(r.ov)}</td><td class="n" data-l="Input tax">${peso(r.iv)}</td><td class="n" data-l="Net VAT">${peso(r.ov - r.iv)}</td></tr>`).join('')}</tbody></table></div>` : ''}</div></div>`;
 }
 const vDash = () => st.client ? vClient() : vFirm();
 
@@ -757,6 +778,7 @@ function vUpload(){
    <div class="q">${q || '<div class="empty card">Nothing waiting. Files you add show here until you approve them.</div>'}</div>`;
 }
 
+const HM = ['tin','vat_type','branch','min','zero_rated','vat_exempt'];
 const PF = [['date','Date',''],['doc_no','OR / SI / DR no.',''],['tin','Seller TIN',''],['gross','Gross amount','num'],['seller','Registered name (seller)','w'],['address','Address','w'],['buyer_name','Sold to (buyer name)','w'],['buyer_tin','Buyer TIN',''],['vat_type','VAT or NON-VAT','sel'],['doc_type','Document type','']];
 const SF = [['date','Report date',''],['tin','TIN',''],['branch','Branch code',''],['min','MIN',''],['last_or','Last OR / invoice no.',''],['vatable_sales','Vatable sales','num'],['vat_amount','VAT amount','num'],['zero_rated','Zero rated','num'],['vat_exempt','VAT exempt','num'],['net_sales','Net sales (for checking)','num'],['name','Business name','w'],['remarks','Remarks','w']];
 function fieldsHTML(r){
@@ -812,7 +834,7 @@ function detailHTML(r){
     ? [['Client', cname(r.client)], ['Report date', dl(r.date)], ['TIN', r.tin], ['Branch', r.branch], ['MIN', r.min], ['Last OR', r.last_or], ['Vatable sales', peso(num(r.vatable_sales))], ['VAT amount', peso(num(r.vat_amount))], ['Zero rated', peso(num(r.zero_rated))], ['VAT exempt', peso(num(r.vat_exempt))], ['Total', peso(saleTotal(r))], ['Remarks', r.remarks || '']]
     : [['Client', cname(r.client)], ['Date', dl(r.date)], ['OR / SI / DR no.', r.doc_no], ['Seller', r.seller], ['Address', r.address], ['Seller TIN', r.tin], ['Buyer', (r.buyer_name || 'none shown') + (r.buyer_tin ? ' · ' + r.buyer_tin : '')], ['Gross amount', peso(num(r.gross))], ['VAT or NON-VAT', r.vat_type], ['Document type', r.doc_type]];
   const locked = signOf(r.client, monthOf(r)) === 'locked';
-  return `<div class="card"><div class="bar" style="margin-top:0;justify-content:space-between"><h2>${r.kind === 'sale' ? 'Z-Reading' : 'Receipt'} scan</h2><button class="btn ghost small" data-close>Close</button></div>
+  return `<div class="card detail"><div class="bar" style="margin-top:0;justify-content:space-between"><h2>${r.kind === 'sale' ? 'Z-Reading' : 'Receipt'} scan</h2><button class="btn ghost small" data-close>Close</button></div>
    <div class="photo"><img data-scan="${r.id}" alt="Scan of ${esc(r.name)}"></div>
    <dl class="dl" style="margin-top:10px">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
    <p class="note" style="margin-top:8px">${r.approvedBy ? 'Approved by ' + esc(r.approvedBy) + '. ' : ''}File: ${esc(r.name)}</p>
@@ -830,7 +852,7 @@ function vRecords(kind){
     : `<select data-fl="vt" aria-label="VAT type"><option value="">VAT and NON-VAT</option>${opt('vt','VAT','VAT')}${opt('vt','NON-VAT','NON-VAT')}</select><select data-fl="b" aria-label="Buyer check"><option value="">Any buyer check</option>${opt('b','ok','Matches client')}${opt('b','none','No buyer shown')}${opt('b','other','Other buyer')}</select>`;
   return `<div class="card"><h2>${isS ? 'Daily sales from Z-Readings' : 'Purchase receipts'}${st.client ? ' · ' + esc(cname(st.client)) : ' · all clients'}</h2><p class="note">Search, filter and sort. Click a row to see the scan.</p>
    <div class="bar"><input type="search" data-fl="q" value="${esc(f.q || '')}" placeholder="${isS ? 'Search date, branch, MIN or last OR' : 'Search name, TIN, OR/SI no. or client'}" aria-label="Search"><select data-fl="s" aria-label="Status"><option value="">Approved and pending</option>${opt('s','approved','Approved')}${opt('s','pending','Pending check')}</select>${filt}<span class="count">${rows.length} of ${all.length}</span></div></div>
-   <div class="split" style="margin-top:12px"><div class="tw"><table><thead><tr>${cs.map(c => `<th class="${c[2] || ''}" data-sk="${c[0]}">${c[1]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr data-id="${r.id}" class="${st.sel === r.id ? 'sel' : ''}">${cs.map(c => `<td class="${c[2] || ''}">${cellVal(r, c[0])}</td>`).join('')}</tr>`).join('') || `<tr style="cursor:default"><td colspan="${cs.length}" class="empty">No records yet.</td></tr>`}</tbody></table></div>${sel ? detailHTML(sel) : '<div class="card empty">Pick a row to see its scan.</div>'}</div>`;
+   <div class="split" style="margin-top:12px"><div class="tw"><table><thead><tr>${cs.map(c => `<th class="${c[2] || ''}" data-sk="${c[0]}">${c[1]}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr data-id="${r.id}" class="${st.sel === r.id ? 'sel' : ''}">${cs.map(c => `<td class="${(c[2] || '') + (HM.includes(c[0]) ? ' hm' : '') + (c[0] === 'seller' || c[0] === 'client' ? ' ttl' : '')}" data-l="${c[1]}">${cellVal(r, c[0])}</td>`).join('')}</tr>`).join('') || `<tr style="cursor:default"><td colspan="${cs.length}" class="empty">No records yet.</td></tr>`}</tbody></table></div>${sel ? detailHTML(sel) : '<div class="card empty nom">Pick a row to see its scan.</div>'}</div>`;
 }
 
 /* ---------- export in the office's own Excel format ---------- */
@@ -1015,7 +1037,7 @@ function vExport(){
   if (!CL.length) return `<div class="card empty">Add a client first.</div>`;
   if (!st.client) {
     return `<div class="card"><h2>Export to Excel${st.month ? ' for ' + ml(st.month) : ''}</h2><p class="note">One workbook per client, in the office's layout. Only approved records are included. Pick a client at the top to preview its sheets.</p>
-    <div class="tw" style="margin-top:10px"><table><thead><tr><th>Client</th><th>Workbook</th><th class="n">VAT rows</th><th class="n">NON-VAT rows</th><th class="n">Z-Readings</th><th class="n">Pending</th><th></th></tr></thead><tbody>${CL.map(c => { const { rows, sales } = exportSets(c.id, st.month); return `<tr style="cursor:default"><td><b>${esc(c.name)}</b></td><td class="mono">${esc(fileName(c, st.month))}</td><td class="n">${rows.filter(r => r.vat_type === 'VAT').length}</td><td class="n">${rows.filter(r => r.vat_type !== 'VAT').length}</td><td class="n">${c.sales ? sales.length : 'n/a'}</td><td class="n">${REC.filter(r => r.client === c.id && r.state === 'pending').length}</td><td><button class="btn ghost small" data-dl="${c.id}">Download</button></td></tr>`; }).join('')}</tbody></table></div></div>`;
+    <div class="tw" style="margin-top:10px"><table><thead><tr><th>Client</th><th>Workbook</th><th class="n">VAT rows</th><th class="n">NON-VAT rows</th><th class="n">Z-Readings</th><th class="n">Pending</th><th></th></tr></thead><tbody>${CL.map(c => { const { rows, sales } = exportSets(c.id, st.month); return `<tr style="cursor:default"><td class="ttl"><b>${esc(c.name)}</b></td><td class="mono hm" data-l="Workbook">${esc(fileName(c, st.month))}</td><td class="n" data-l="VAT rows">${rows.filter(r => r.vat_type === 'VAT').length}</td><td class="n" data-l="NON-VAT rows">${rows.filter(r => r.vat_type !== 'VAT').length}</td><td class="n" data-l="Z-Readings">${c.sales ? sales.length : 'n/a'}</td><td class="n" data-l="Pending">${REC.filter(r => r.client === c.id && r.state === 'pending').length}</td><td><button class="btn ghost small" data-dl="${c.id}">Download</button></td></tr>`; }).join('')}</tbody></table></div></div>`;
   }
   const c = clientOf(st.client), m = st.month, mlabel = m ? MONTHS[+m.slice(5) - 1] : 'ALL MONTHS';
   const { rows: p, sales: s } = exportSets(c.id, m), pv = p.filter(r => r.vat_type === 'VAT'), pn = p.filter(r => r.vat_type !== 'VAT');
@@ -1032,7 +1054,7 @@ function vExport(){
   return `<div class="card"><h2>Export to Excel · ${esc(c.name)}</h2><p class="note">One workbook in the office's own layout: a VAT and a NON-VAT purchases sheet per month${c.sales ? ', the ESALES sheet' : ''}, and a master sheet so everything can be filtered and searched in Excel. Only approved records are included.</p>
    <div class="bar"><span class="count">Month: ${m ? ml(m) : 'all months'} (change it at the top)</span><span style="flex:1"></span><button class="btn" data-dl="${c.id}">Download Excel file</button></div>
    <div class="sheets">${names.map((n, i) => `<button class="sheet ${i === x ? 'on' : ''}" data-xs="${i}">${n}</button>`).join('')}</div>
-   <div class="tw" style="max-height:none">${prev}</div><p class="note" style="margin-top:8px">First 8 rows shown. Input tax and vatable purchases are real Excel formulas, like in the office's template.</p></div>`;
+   <div class="tw nom" style="max-height:none">${prev}</div><p class="note nom" style="margin-top:8px">First 8 rows shown. Input tax and vatable purchases are real Excel formulas, like in the office's template.</p></div>`;
 }
 const vActivity = () => {
   const rows = LOG.filter(l => !st.client || l.client === st.client);
